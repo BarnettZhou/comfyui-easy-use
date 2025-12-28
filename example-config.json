@@ -1,3 +1,10 @@
 {
-    "server": "http://127.0.0.1:8000"
+    "server": "http://127.0.0.1:8000",
+    "diffusion_models": [
+        "z_image_turbo_bf16.safetensors"
+    ],
+    "vae_models": [
+        "ae.safetensors"
+    ],
+    "prefix": "zit"
 }
