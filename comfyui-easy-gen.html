@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DarkBeast API 控制台</title>
+    <link rel="icon" href="icon.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .drawer { transition: transform 0.3s ease-in-out; }
+        .drawer-closed { transform: translateX(100%); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <h1 class="text-2xl font-bold border-b border-gray-700 pb-4">ZIT 控制台</h1>
+
+        <div class="grid grid-cols-2 gap-6 bg-gray-800 p-6 rounded-xl shadow-lg">
+            <div class="col-span-2">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-sm font-medium">提示词</label>
+                    <button id="promptToggleBtn" onclick="togglePromptHeight()" class="text-xs bg-gray-700 px-3 py-2 rounded hover:bg-gray-600 inline-flex whitespace-nowrap flex-shrink-0 w-fit">放大</button>
+                </div>
+                <textarea id="promptText" rows="3" class="w-full bg-gray-700 rounded p-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+            </div>
+
+            <div>
+                <label class="block mb-2 text-sm font-medium">模型</label>
+                <select id="modelSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
+            </div>
+
+            <div>
+                <label class="block mb-2 text-sm font-medium">VAE</label>
+                <select id="vaeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
+            </div>
+
+            <div>
+                <label class="block mb-2 text-sm font-medium">图片尺寸</label>
+                <select id="sizeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg" onchange="updateResHint()">
+                    <option value="768,768">测试用1:1 (768x768)</option>
+                    <option value="630,840">测试用3:4 (630x840)</option>
+                    <option value="840,630">测试用4:3 (840x630)</option>
+                    <option value="1024,1024">1:1 (1024x1024)</option>
+                    <option value="1200,1200">1:1 (1200x1200)</option>
+                    <option value="900,1200" selected>3:4 (900x1200)</option>
+                    <option value="1200,1600">3:4 (1200x1600)</option>
+                    <option value="1200,900">4:3 (1200x900)</option>
+                    <option value="1600,1200">4:3 (1600x1200)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block mb-2 text-sm font-medium">采样器组合</label>
+                <select id="samplerSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                    <option value="er_sde,sgm_uniform">er_sde + sgm_uniform</option>
+                    <option value="er_sde,simple">er_sde + simple</option>
+                    <option value="res_multistep,simple">res_multistep + simple</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block mb-2 text-sm font-medium">图片放大</label>
+                <div class="flex items-center space-x-4 mt-2">
+                    <input type="checkbox" id="upscaleEnable" class="w-5 h-5">
+                    <select id="upscaleScale" class="bg-gray-700 py-3 px-3 rounded-lg" onchange="updateResHint()">
+                        <option value="1.2">1.2x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.3">1.3x</option>
+                        <option value="1.35">1.35x</option>
+                        <option value="1.4">1.4x</option>
+                        <option value="1.45">1.45x</option>
+                        <option value="1.5" selected>1.5x</option>
+                        <option value="1.55">1.55x</option>
+                        <option value="1.6">1.6x</option>
+                        <option value="1.65">1.65x</option>
+                        <option value="1.7">1.7x</option>
+                        <option value="1.75">1.75x</option>
+                    </select>
+                    <span id="targetRes" class="text-xs text-gray-400">1356 x 1800</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block mb-2 text-sm font-medium">Denoise参数</label>
+                <input type="number" id="denoiseValue" value="0.8" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select id="batchCount" class="md:col-span-1 bg-gray-700 py-3 px-3 rounded-lg min-w-[60px]">
+                        <option value="1">1</option><option value="2">2</option>
+                        <option value="4">4</option><option value="8">8</option>
+                        <option value="16">16</option>
+                    </select>
+                <button id="generateBtn" onclick="queuePrompt()" class="md:col-span-2 bg-blue-600 hover:bg-blue-700 py-3 px-4 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed">开始生成</button>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="interruptTask('current')" class="bg-yellow-600 hover:bg-yellow-700 py-3 rounded-lg text-sm">取消当前</button>
+                <button onclick="interruptTask('all')" class="bg-red-600 hover:bg-red-700 py-3 rounded-lg text-sm">清空队列</button>
+                <button onclick="toggleDrawer()" class="bg-purple-600 hover:bg-purple-700 py-3 rounded-lg text-sm">生成记录</button>
+            </div>
+        </div>
+
+        <div id="resultArea" class="mt-8 border-t border-gray-700 pt-6">
+            <h2 class="text-xl mb-4 text-gray-400">本次生成结果</h2>
+            <div id="imageContainer" class="grid grid-cols-2 gap-4"></div>
+        </div>
+    </div>
+
+    <!-- 抽屉遮罩 -->
+    <div id="drawerOverlay" class="fixed inset-0 bg-black/50 z-30 hidden"></div>
+    
+    <div id="drawer" class="drawer drawer-closed fixed top-0 right-0 h-full w-full max-w-[600px] bg-gray-800 shadow-2xl z-40 border-l border-gray-600 text-white">
+        <!-- 固定的标题栏 -->
+        <div class="fixed top-0 right-0 w-full max-w-[600px] bg-gray-800 border-l border-gray-600 z-50 p-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">生成记录</h3>
+                <button onclick="toggleDrawer()" class="text-2xl">&times;</button>
+            </div>
+        </div>
+        <!-- 可滚动的内容区域 -->
+        <div class="pt-16 p-4 overflow-y-auto h-full">
+            <div id="historyList" class="grid grid-cols-2 gap-4"></div>
+        </div>
+    </div>
+
+    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-2 md:p-4">
+        <button onclick="sendToConsole()" class="absolute top-3 right-64 md:top-4 md:right-72 bg-green-600 text-white px-3 py-1 text-sm md:px-4 md:py-2 rounded">发送到控制台</button>
+        <button onclick="openInNewTab()" class="absolute top-3 right-24 md:top-4 md:right-36 bg-blue-600 text-white px-3 py-1 text-sm md:px-4 md:py-2 rounded">新标签页打开</button>
+        <button onclick="closePreview()" class="absolute top-3 right-3 md:top-4 md:right-6 text-3xl md:text-4xl">&times;</button>
+        
+        <!-- 上一张按钮 -->
+        <button id="prevBtn" onclick="prevImage()" class="absolute left-2 md:left-8 text-4xl md:text-6xl text-white bg-black/50 hover:bg-black/70 p-2 md:p-4 rounded-full transition-opacity opacity-70 hover:opacity-100">
+            &lt;
+        </button>
+        
+        <!-- 下一张按钮 -->
+        <button id="nextBtn" onclick="nextImage()" class="absolute right-2 md:right-8 text-4xl md:text-6xl text-white bg-black/50 hover:bg-black/70 p-2 md:p-4 rounded-full transition-opacity opacity-70 hover:opacity-100">
+            &gt;
+        </button>
+        
+        <img id="previewImg" src="" class="max-h-full max-w-full shadow-2xl">
+    </div>
+
+    <!-- Toast通知组件 -->
+    <div id="toast" class="fixed top-5 right-5 bg-gray-800 text-white py-3 px-5 rounded-lg shadow-lg transform translate-x-full opacity-0 transition-all duration-300 z-50">
+        <div id="toastMessage"></div>
+    </div>
+</body>
+<script>
+    // 配置从外部JSON文件加载
+    let SERVER;
+    let originalWorkflow;
+    
+    // 全局状态控制
+    let isGenerating = false;
+    let shouldStop = false;
+    let clearOnNextRender = false; 
+    let historyImages = [];     // 存储历史图片URL数组
+    let historyImageData = [];  // 存储历史图片URL和任务ID的关联信息
+    let currentPreviewIndex = 0; // 当前预览图片的索引 
+    let currentTaskId = null;   // 当前预览图片的任务ID
+    let prefix; // 文件保存前缀全局变量
+    let historyPollingTimer = null; // 历史记录轮询定时器
+    let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
+
+    // 页面卸载时停止轮询
+    window.addEventListener('beforeunload', stopHistoryPolling);
+    
+    // 初始化时加载配置
+    async function initConfig() {
+        try {
+            // 加载服务器配置
+            const configResponse = await fetch('config.json');
+            const config = await configResponse.json();
+            SERVER = config.SERVER;
+            
+            // 加载工作流配置
+            const workflowResponse = await fetch('original_workflow.json');
+            originalWorkflow = await workflowResponse.json();
+            
+            // 初始化模型下拉选项
+            const modelSelect = document.getElementById('modelSelect');
+            modelSelect.innerHTML = '';
+            config.diffusion_models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+            
+            // 初始化VAE下拉选项
+            const vaeSelect = document.getElementById('vaeSelect');
+            vaeSelect.innerHTML = '';
+            config.vae_models.forEach(vae => {
+                const option = document.createElement('option');
+                option.value = vae;
+                option.textContent = vae;
+                vaeSelect.appendChild(option);
+            });
+
+            // 文件保存设置
+            prefix = config.prefix;
+
+            console.log('配置加载成功');
+        } catch (error) {
+            console.error('加载配置文件失败:', error);
+            alert('加载配置文件失败，请检查服务器是否正常运行');
+        }
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', initConfig);
+
+    // 分辨率提示更新
+    function updateResHint() {
+        const [w, h] = document.getElementById('sizeSelect').value.split(',').map(Number);
+        const scale = parseFloat(document.getElementById('upscaleScale').value);
+        document.getElementById('targetRes').innerText = `${Math.round(w * scale)} x ${Math.round(h * scale)}`;
+    }
+
+    // 主生成逻辑
+    async function queuePrompt() {
+        if (isGenerating) return; 
+
+        // 验证提示词是否为空
+        const promptText = document.getElementById('promptText').value;
+        if (!promptText.trim()) {
+            showToast('请输入提示词后再生成');
+            return;
+        }
+
+        isGenerating = true;
+        shouldStop = false;
+        clearOnNextRender = true; 
+        
+        const btn = document.getElementById('generateBtn');
+        const originalText = btn.innerText;
+        
+        btn.disabled = true;
+        btn.classList.remove('hover:bg-blue-700'); 
+
+        try {
+            const p = JSON.parse(JSON.stringify(originalWorkflow));
+            const [w, h] = document.getElementById('sizeSelect').value.split(',').map(Number);
+            const [sampler, scheduler] = document.getElementById('samplerSelect').value.split(',');
+            const seed = Math.floor(Math.random() * 1000000000000);
+            const batchCount = parseInt(document.getElementById('batchCount').value);
+
+            // 基础参数
+            p["6"].inputs.text = document.getElementById('promptText').value;
+            p["5"].inputs.width = w;
+            p["5"].inputs.height = h;
+            p["3"].inputs.seed = seed;
+            p["3"].inputs.sampler_name = sampler;
+            p["3"].inputs.scheduler = scheduler;
+            
+            // 模型和VAE参数
+            p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
+            p["32"].inputs.vae_name = document.getElementById('vaeSelect').value;
+
+            // 保存参数
+            const date_str = new Date().toISOString().split('T')[0];
+            p["42"].inputs.filename_prefix = `zit-api/${date_str}/${prefix}`;
+            p["9"].inputs.filename_prefix = `zit-api/${date_str}/${prefix}`;
+
+            // 放大处理
+            if(!document.getElementById('upscaleEnable').checked) {
+                delete p["38"]; delete p["39"]; delete p["40"]; delete p["42"];
+            } else {
+                p["38"].inputs.scale_by = parseFloat(document.getElementById('upscaleScale').value);
+                p["40"].inputs.seed = seed;
+                p["40"].inputs.sampler_name = sampler;
+                p["40"].inputs.scheduler = scheduler;
+                p["40"].inputs.denoise = parseFloat(document.getElementById('denoiseValue').value);
+            }
+
+            for(let i = 0; i < batchCount; i++) {
+                if (shouldStop) break; 
+                btn.innerText = `Running ${i + 1}/${batchCount}`;
+
+                const res = await fetch(`${SERVER}/prompt`, {
+                    method: 'POST',
+                    body: JSON.stringify({ prompt: p })
+                });
+                const data = await res.json();
+
+                await trackTask(data.prompt_id);
+
+                // 简单的种子递增，防止批量生成的图一模一样
+                p["3"].inputs.seed += 1;
+                if(p["40"]) p["40"].inputs.seed += 1;
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("任务发送失败，请检查控制台连接");
+        } finally {
+            isGenerating = false;
+            btn.disabled = false;
+            btn.innerText = originalText;
+            btn.classList.add('hover:bg-blue-700');
+        }
+    }
+
+    function trackTask(id) {
+        return new Promise((resolve) => {
+            const timer = setInterval(async () => {
+                try {
+                    const res = await fetch(`${SERVER}/history/${id}`);
+                    const data = await res.json();
+                    if(data[id]) {
+                        clearInterval(timer);
+                        renderImg(data[id].outputs);
+                        resolve(); 
+                    }
+                } catch(e) { }
+            }, 1000); 
+        });
+    }
+
+    // 渲染图片
+    function renderImg(outputs) {
+        const container = document.getElementById('imageContainer');
+        
+        if (clearOnNextRender) {
+            container.innerHTML = ""; 
+            clearOnNextRender = false; 
+        }
+
+        const nodeIds = Object.keys(outputs).sort().reverse();
+
+        for(let nodeId of nodeIds) {
+            outputs[nodeId].images.forEach(img => {
+                const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+                
+                const wrapper = document.createElement('div');
+                wrapper.className = "relative group animate-fade-in"; 
+                wrapper.innerHTML = `
+                    <img src="${url}" loading="lazy" onclick="openResultPreview('${url}')" 
+                         class="w-full h-auto rounded-lg shadow-lg cursor-pointer hover:opacity-90 transition border border-gray-700">
+                    <span class="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                        ${nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图'}
+                    </span>
+                `;
+                container.prepend(wrapper); 
+            });
+        }
+    }
+
+    // 历史记录
+    async function loadHistory() {
+        const res = await fetch(`${SERVER}/history`);
+        const data = await res.json();
+        const list = document.getElementById('historyList');
+        const newEntries = []; // 存储新的历史记录项
+        const newHistoryImages = []; // 存储新的历史图片URL
+        const newHistoryImageData = []; // 存储新的历史图片数据
+
+        // 遍历历史记录（倒序，最新的在前面）
+        Object.entries(data).reverse().forEach(([taskId, item]) => {
+            if(!item.outputs) return;
+            for(let nid in item.outputs) {
+                item.outputs[nid].images?.forEach(img => {
+                    // 【修复点】同样增加 encodeURIComponent
+                    const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+
+                    // 生成唯一标识，防止重复加载相同图片（包含taskId、节点ID和文件名）
+                    const imageKey = `${taskId}-${nid}-${img.filename}`;
+                    
+                    // 检查图片是否已经显示，如果没有则添加
+                    if (!displayedTaskIds.has(imageKey)) {
+                        // 标记图片为已显示
+                        displayedTaskIds.add(imageKey);
+                        
+                        // 创建图片容器
+                        const imgWrapper = document.createElement('div');
+                        imgWrapper.className = "relative w-full mb-2";
+                        
+                        // 创建新的图片元素
+                        const i = document.createElement('img');
+                        i.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; // 空白占位图
+                        i.setAttribute('data-src', url); // 存储真实图片URL
+                        i.loading = 'lazy';
+                        i.className = "w-full rounded cursor-pointer border border-gray-600 hover:border-blue-500";
+                        i.onclick = () => openPreview(url, taskId);
+
+                        // 当图片进入视口时加载真实图片，离开视口时回收资源
+                        const observer = new IntersectionObserver((entries) => {
+                            entries.forEach(entry => {
+                                const img = entry.target;
+                                if (entry.isIntersecting) {
+                                    // 图片进入视口，加载真实图片
+                                    img.src = img.getAttribute('data-src');
+                                } else {
+                                    // 图片离开视口，回收资源
+                                    img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+                                }
+                            });
+                        }, {
+                            // 当图片50%进入视口时触发加载
+                            threshold: 0.5
+                        });
+
+                        observer.observe(i);
+                        
+                        // 添加类型标签
+                        const isLargeImage = nid === '39' || nid === '42';
+                        const labelText = isLargeImage ? '高清大图' : '预览草图';
+                        const labelColor = isLargeImage ? 'bg-purple-600' : 'bg-blue-600';
+                        
+                        const label = document.createElement('span');
+                        label.className = `absolute top-2 right-2 ${labelColor} text-white text-xs px-2 py-1 rounded backdrop-blur-sm z-10`;
+                        label.textContent = labelText;
+                        
+                        // 将图片和标签添加到容器
+                        imgWrapper.appendChild(i);
+                        imgWrapper.appendChild(label);
+                        
+                        // 将新元素和数据存储起来
+                        newEntries.unshift(imgWrapper); // 保持最新的在前面
+                        newHistoryImages.unshift(url); // 保持最新的在前面
+                        newHistoryImageData.unshift({ url, taskId }); // 保持最新的在前面
+                    }
+                });
+            }
+        });
+
+        // 如果有新的记录，添加到列表顶部
+        if (newEntries.length > 0) {
+            // 将新记录添加到列表开头
+            newEntries.forEach(entry => {
+                list.insertBefore(entry, list.firstChild);
+            });
+            
+            // 更新历史数组（保持最新的在前面）
+            historyImages = [...newHistoryImages, ...historyImages];
+            historyImageData = [...newHistoryImageData, ...historyImageData];
+        }
+    }
+
+    async function interruptTask(type) {
+        shouldStop = true;
+        if(type === 'all') {
+            await fetch(`${SERVER}/queue`, { method: 'POST', body: JSON.stringify({clear: true}) });
+            alert("已请求清空队列");
+        } else {
+            await fetch(`${SERVER}/interrupt`, { method: 'POST' });
+        }
+    }
+
+    function openPreview(url, taskId) {
+        document.getElementById('previewImg').src = url;
+        document.getElementById('fullPreview').classList.remove('hidden');
+
+        // 查找当前图片在历史数组中的索引
+        currentPreviewIndex = historyImages.indexOf(url);
+        currentTaskId = taskId;
+
+        // 显示导航按钮
+        document.getElementById('prevBtn').classList.remove('hidden');
+        document.getElementById('nextBtn').classList.remove('hidden');
+    }
+
+    function closePreview() { document.getElementById('fullPreview').classList.add('hidden'); }
+    function toggleDrawer() { 
+        const drawer = document.getElementById('drawer');
+        const overlay = document.getElementById('drawerOverlay');
+
+        drawer.classList.toggle('drawer-closed');
+        overlay.classList.toggle('hidden');
+
+        if(!drawer.classList.contains('drawer-closed')) {
+            // 抽屉打开时，清空已显示图片键集合和历史数组
+            displayedTaskIds.clear();
+            historyImages = [];
+            historyImageData = [];
+            // 清空历史记录列表
+            document.getElementById('historyList').innerHTML = "";
+            // 重新加载所有历史记录
+            loadHistory();
+            // 启动轮询
+            startHistoryPolling();
+        } else {
+            // 抽屉关闭时，停止轮询
+            stopHistoryPolling();
+        }
+    }
+
+    // 点击遮罩关闭抽屉
+    document.getElementById('drawerOverlay').addEventListener('click', toggleDrawer);
+    
+    // 开始历史记录轮询
+    function startHistoryPolling() {
+        // 如果已经有定时器在运行，先停止
+        if (historyPollingTimer) {
+            clearInterval(historyPollingTimer);
+        }
+        // 每3秒检查一次新任务
+        historyPollingTimer = setInterval(loadHistory, 3000);
+    }
+    
+    // 停止历史记录轮询
+    function stopHistoryPolling() {
+        if (historyPollingTimer) {
+            clearInterval(historyPollingTimer);
+            historyPollingTimer = null;
+        }
+    }
+    
+    function openInNewTab() {
+        const imgUrl = document.getElementById('previewImg').src;
+        window.open(imgUrl, '_blank');
+    }
+
+    // 发送到控制台功能
+    async function sendToConsole() {
+        if (!currentTaskId) {
+            showToast('无法获取任务参数，请确保从历史记录中选择图片');
+            return;
+        }
+
+        try {
+            // 从服务器获取任务历史记录
+            const res = await fetch(`${SERVER}/history/${currentTaskId}`);
+            const data = await res.json();
+            const task = data[currentTaskId];
+
+            console.log(task);
+
+            if (!task || !task.prompt) {
+                showToast('无法获取任务参数');
+                return;
+            }
+
+            const promptData = task.prompt[2];
+
+            // 填充表单参数
+            // 提示词
+            if (promptData["6"] && promptData["6"].inputs.text) {
+                document.getElementById('promptText').value = promptData["6"].inputs.text;
+            }
+
+            // 模型和VAE
+            if (promptData["34"] && promptData["34"].inputs.unet_name) {
+                document.getElementById('modelSelect').value = promptData["34"].inputs.unet_name;
+            }
+
+            if (promptData["32"] && promptData["32"].inputs.vae_name) {
+                document.getElementById('vaeSelect').value = promptData["32"].inputs.vae_name;
+            }
+
+            // 图片尺寸
+            if (promptData["5"] && promptData["5"].inputs.width && promptData["5"].inputs.height) {
+                const sizeValue = `${promptData["5"].inputs.width},${promptData["5"].inputs.height}`;
+                document.getElementById('sizeSelect').value = sizeValue;
+                updateResHint(); // 更新目标分辨率提示
+            }
+
+            // 采样器组合
+            if (promptData["3"] && promptData["3"].inputs.sampler_name && promptData["3"].inputs.scheduler) {
+                const samplerValue = `${promptData["3"].inputs.sampler_name},${promptData["3"].inputs.scheduler}`;
+                document.getElementById('samplerSelect').value = samplerValue;
+            }
+
+            // 图片放大设置
+            if (promptData["38"] && promptData["38"].inputs.scale_by) {
+                document.getElementById('upscaleEnable').checked = true;
+                document.getElementById('upscaleScale').value = promptData["38"].inputs.scale_by;
+                updateResHint(); // 更新目标分辨率提示
+            } else {
+                document.getElementById('upscaleEnable').checked = false;
+            }
+
+            // Denoise参数
+            if (promptData["40"] && promptData["40"].inputs.denoise) {
+                document.getElementById('denoiseValue').value = promptData["40"].inputs.denoise;
+            }
+
+            // 关闭预览
+            closePreview();
+            toggleDrawer();
+            showToast('参数已成功发送到控制台');
+        } catch (error) {
+            console.error('发送到控制台失败:', error);
+            showToast('获取任务参数失败，请重试');
+        }
+    }
+
+    // 上一张图片
+    function prevImage() {
+        if (currentPreviewIndex > 0) {
+            currentPreviewIndex--;
+            document.getElementById('previewImg').src = historyImages[currentPreviewIndex];
+            // 更新当前任务ID
+            if (historyImageData[currentPreviewIndex]) {
+                currentTaskId = historyImageData[currentPreviewIndex].taskId;
+            }
+        }
+    }
+
+    // 下一张图片
+    function nextImage() {
+        if (currentPreviewIndex >= 0 && currentPreviewIndex < historyImages.length - 1) {
+            currentPreviewIndex++;
+            document.getElementById('previewImg').src = historyImages[currentPreviewIndex];
+            // 更新当前任务ID
+            if (historyImageData[currentPreviewIndex]) {
+                currentTaskId = historyImageData[currentPreviewIndex].taskId;
+            }
+        }
+    }
+
+    // 键盘事件监听
+    document.addEventListener('keydown', function(e) {
+        // 只有在预览模式打开时才响应键盘事件
+        if (!document.getElementById('fullPreview').classList.contains('hidden')) {
+            if (e.key === 'ArrowLeft') {
+                prevImage();
+            } else if (e.key === 'ArrowRight') {
+                nextImage();
+            } else if (e.key === 'Escape') {
+                closePreview();
+            }
+        }
+    });
+
+    // 控制提示词输入框高度
+    function togglePromptHeight() {
+        const textarea = document.getElementById('promptText');
+        const toggleBtn = document.getElementById('promptToggleBtn');
+
+        // 检查当前是否处于展开状态
+        if (textarea.style.height === '400px') {
+            // 折叠状态
+            textarea.style.height = '';
+            textarea.setAttribute('rows', '3');
+            toggleBtn.textContent = '放大';
+        } else {
+            // 展开状态
+            textarea.style.height = '400px';
+            toggleBtn.textContent = '缩小';
+        }
+    }
+
+    // Toast通知函数
+    function showToast(message, duration = 3000) {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toastMessage');
+
+        // 设置消息内容
+        toastMessage.textContent = message;
+
+        // 显示toast
+        toast.classList.remove('translate-x-full', 'opacity-0');
+        toast.classList.add('translate-x-0', 'opacity-100');
+
+        // 自动隐藏toast
+        setTimeout(() => {
+            toast.classList.remove('translate-x-0', 'opacity-100');
+            toast.classList.add('translate-x-full', 'opacity-0');
+        }, duration);
+    }
+    
+    // 预览生成结果图片（独立预览，不参与历史导航）
+    function openResultPreview(url) {
+        const preview = document.getElementById('fullPreview');
+        const previewImg = document.getElementById('previewImg');
+
+        // 显示预览但不设置当前索引，这样导航按钮将不会工作
+        previewImg.src = url;
+        preview.classList.remove('hidden');
+
+        // 临时将历史导航功能禁用
+        currentPreviewIndex = -1;
+        currentTaskId = null; // 从当前结果打开的图片没有历史任务ID
+
+        // 隐藏导航按钮
+        document.getElementById('prevBtn').classList.add('hidden');
+        document.getElementById('nextBtn').classList.add('hidden');
+    }
+
+    // 点击预览遮罩关闭预览
+    document.getElementById('fullPreview').addEventListener('click', function(e) {
+        // 只有点击遮罩本身（而不是内部的按钮或图片）时才关闭预览
+        if (e.target === this) {
+            closePreview();
+        }
+    });
+</script>
+</html>
