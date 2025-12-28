@@ -45,7 +45,8 @@
                     <option value="840,630">测试用4:3 (840x630)</option>
                     <option value="1024,1024">1:1 (1024x1024)</option>
                     <option value="1200,1200">1:1 (1200x1200)</option>
-                    <option value="900,1200" selected>3:4 (900x1200)</option>
+                    <option value="720,960" selected>3:4 (720x960)</option>
+                    <option value="900,1200">3:4 (900x1200)</option>
                     <option value="1200,1600">3:4 (1200x1600)</option>
                     <option value="1200,900">4:3 (1200x900)</option>
                     <option value="1600,1200">4:3 (1600x1200)</option>
@@ -85,7 +86,7 @@
 
             <div>
                 <label class="block mb-2 text-sm font-medium">Denoise参数</label>
-                <input type="number" id="denoiseValue" value="0.8" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                <input type="number" id="denoiseValue" value="0.5" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
             </div>
 
             <div id="progressContainer" class="col-span-2 hidden space-y-3 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -369,7 +370,7 @@
 
                 // 简单的种子递增，防止批量生成的图一模一样
                 p["3"].inputs.seed += 1;
-                if(p["40"]) p["40"].inputs.seed += 1;
+                if(p["40"]) p["40"].inputs.seed = p["3"].inputs.seed;
             }
 
         } catch (e) {
@@ -479,7 +480,7 @@
                             });
                         }, {
                             // 当图片50%进入视口时触发加载
-                            threshold: 0.5
+                            threshold: 0.1
                         });
 
                         observer.observe(i);
