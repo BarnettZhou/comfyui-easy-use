@@ -87,6 +87,27 @@
                 <label class="block mb-2 text-sm font-medium">Denoise参数</label>
                 <input type="number" id="denoiseValue" value="0.8" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
             </div>
+
+            <div id="progressContainer" class="col-span-2 hidden space-y-3 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-blue-400 font-bold">初步采样 (Step 1/2)</span>
+                        <span id="progressText1">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2">
+                        <div id="progress1" class="bg-blue-500 h-2 rounded-full transition-all duration-300 w-0"></div>
+                    </div>
+                </div>
+                <div id="progressSection2" class="space-y-1 opacity-50">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-purple-400 font-bold">二次采样 (Step 2/2)</span>
+                        <span id="progressText2">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2">
+                        <div id="progress2" class="bg-purple-500 h-2 rounded-full transition-all duration-300 w-0"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -167,6 +188,7 @@
     let prefix; // 文件保存前缀全局变量
     let historyPollingTimer = null; // 历史记录轮询定时器
     let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
+    let socket; // WebSocket 实例，用于监听进度更新
 
     // 页面卸载时停止轮询
     window.addEventListener('beforeunload', stopHistoryPolling);
@@ -206,11 +228,61 @@
             // 文件保存设置
             prefix = config.prefix;
 
+            // 初始化WebSocket连接
+            setupWebSocket();
+
             console.log('配置加载成功');
         } catch (error) {
             console.error('加载配置文件失败:', error);
             alert('加载配置文件失败，请检查服务器是否正常运行');
         }
+    }
+
+    // 初始化 WebSocket 监听执行进度
+    function setupWebSocket() {
+        const wsUrl = SERVER.replace('http', 'ws') + '/ws?clientId=easy_gen_client';
+        socket = new WebSocket(wsUrl);
+
+        socket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            
+            if (msg.type === 'progress') {
+                const { value, max, node } = msg.data;
+                const percent = Math.round((value / max) * 100) + '%';
+                
+                // 根据 original_workflow.json 节点 ID 分配进度
+                if (node === "3") { // 初步采样节点
+                    document.getElementById('progress1').style.width = percent;
+                    document.getElementById('progressText1').innerText = percent;
+                    document.getElementById('progressSection2').classList.add('opacity-50');
+                } else if (node === "40") { // 二次采样节点
+                    document.getElementById('progress2').style.width = percent;
+                    document.getElementById('progressText2').innerText = percent;
+                    document.getElementById('progressSection2').classList.remove('opacity-50');
+                }
+            }
+
+            if (msg.type === 'execution_start') {
+                resetProgress();
+            }
+            
+            if (msg.type === 'executing' && msg.data.node === null) {
+                // 队列中所有任务执行完毕
+                setTimeout(() => {
+                    document.getElementById('progressContainer').classList.add('hidden');
+                }, 2000);
+            }
+        };
+
+        socket.onclose = () => setTimeout(setupWebSocket, 5000); // 掉线重连
+    }
+
+    function resetProgress() {
+        document.getElementById('progress1').style.width = '0%';
+        document.getElementById('progress2').style.width = '0%';
+        document.getElementById('progressText1').innerText = '0%';
+        document.getElementById('progressText2').innerText = '0%';
+        document.getElementById('progressSection2').classList.add('opacity-50');
     }
 
     // 页面加载完成后初始化
@@ -237,6 +309,10 @@
         isGenerating = true;
         shouldStop = false;
         clearOnNextRender = true; 
+        
+        // 显示进度条并重置进度
+        document.getElementById('progressContainer').classList.remove('hidden');
+        resetProgress();
         
         const btn = document.getElementById('generateBtn');
         const originalText = btn.innerText;
@@ -593,8 +669,8 @@
 
     // 上一张图片
     function prevImage() {
-        if (currentPreviewIndex > 0) {
-            currentPreviewIndex--;
+        if (currentPreviewIndex >= 0 && currentPreviewIndex < historyImages.length - 1) {
+            currentPreviewIndex++;
             document.getElementById('previewImg').src = historyImages[currentPreviewIndex];
             // 更新当前任务ID
             if (historyImageData[currentPreviewIndex]) {
@@ -605,8 +681,8 @@
 
     // 下一张图片
     function nextImage() {
-        if (currentPreviewIndex >= 0 && currentPreviewIndex < historyImages.length - 1) {
-            currentPreviewIndex++;
+        if (currentPreviewIndex > 0) {
+            currentPreviewIndex--;
             document.getElementById('previewImg').src = historyImages[currentPreviewIndex];
             // 更新当前任务ID
             if (historyImageData[currentPreviewIndex]) {
