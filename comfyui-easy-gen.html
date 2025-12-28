@@ -27,68 +27,97 @@
                 <textarea id="promptText" rows="3" class="w-full bg-gray-700 rounded p-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
             </div>
 
-            <div>
-                <label class="block mb-2 text-sm font-medium">模型</label>
-                <select id="modelSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
-            </div>
+            <!-- 可折叠的生成参数容器 -->
+            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
+                <!-- 标题和展开/收起按钮 -->
+                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
+                    <h3 class="font-medium">生成参数</h3>
+                    <button id="paramsToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleParamsContainer()">收起</button>
+                </div>
+                <!-- 参数表单项 -->
+                <div id="paramsContent" class="p-4 grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">模型</label>
+                        <select id="modelSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
+                    </div>
 
-            <div>
-                <label class="block mb-2 text-sm font-medium">VAE</label>
-                <select id="vaeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
-            </div>
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">VAE</label>
+                        <select id="vaeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
+                    </div>
 
-            <div>
-                <label class="block mb-2 text-sm font-medium">图片尺寸</label>
-                <select id="sizeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg" onchange="updateResHint()">
-                    <option value="768,768">测试用1:1 (768x768)</option>
-                    <option value="630,840">测试用3:4 (630x840)</option>
-                    <option value="840,630">测试用4:3 (840x630)</option>
-                    <option value="1024,1024">1:1 (1024x1024)</option>
-                    <option value="1200,1200">1:1 (1200x1200)</option>
-                    <option value="720,960" selected>3:4 (720x960)</option>
-                    <option value="900,1200">3:4 (900x1200)</option>
-                    <option value="1200,1600">3:4 (1200x1600)</option>
-                    <option value="1200,900">4:3 (1200x900)</option>
-                    <option value="1600,1200">4:3 (1600x1200)</option>
-                </select>
-            </div>
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">采样器组合</label>
+                        <select id="samplerSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                            <option value="er_sde,sgm_uniform">er_sde + sgm_uniform</option>
+                            <option value="er_sde,simple">er_sde + simple</option>
+                            <option value="res_multistep,simple">res_multistep + simple</option>
+                        </select>
+                    </div>
 
-            <div>
-                <label class="block mb-2 text-sm font-medium">采样器组合</label>
-                <select id="samplerSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
-                    <option value="er_sde,sgm_uniform">er_sde + sgm_uniform</option>
-                    <option value="er_sde,simple">er_sde + simple</option>
-                    <option value="res_multistep,simple">res_multistep + simple</option>
-                </select>
-            </div>
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">图片比例</label>
+                        <select id="ratioSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg" onchange="updateSizeOptions()">
+                            <option value="1:1">1:1</option>
+                            <option value="3:4">3:4</option>
+                            <option value="custom">自定义大小</option>
+                        </select>
+                    </div>
 
-            <div>
-                <label class="block mb-2 text-sm font-medium">图片放大</label>
-                <div class="flex items-center space-x-4 mt-2">
-                    <input type="checkbox" id="upscaleEnable" class="w-5 h-5">
-                    <select id="upscaleScale" class="bg-gray-700 py-3 px-3 rounded-lg" onchange="updateResHint()">
-                        <option value="1.2">1.2x</option>
-                        <option value="1.25">1.25x</option>
-                        <option value="1.3">1.3x</option>
-                        <option value="1.35">1.35x</option>
-                        <option value="1.4">1.4x</option>
-                        <option value="1.45">1.45x</option>
-                        <option value="1.5" selected>1.5x</option>
-                        <option value="1.55">1.55x</option>
-                        <option value="1.6">1.6x</option>
-                        <option value="1.65">1.65x</option>
-                        <option value="1.7">1.7x</option>
-                        <option value="1.75">1.75x</option>
-                    </select>
-                    <span id="targetRes" class="text-xs text-gray-400">1356 x 1800</span>
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">图片尺寸</label>
+                        <select id="sizeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg" onchange="updateResHint()">
+                        </select>
+                        <div id="customSizeInputs" class="hidden grid grid-cols-2 gap-2 mt-2">
+                            <input type="number" id="widthInput" placeholder="宽度" min="1" max="4096" class="bg-gray-700 py-3 px-3 rounded-lg">
+                            <input type="number" id="heightInput" placeholder="高度" min="1" max="4096" class="bg-gray-700 py-3 px-3 rounded-lg">
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div>
-                <label class="block mb-2 text-sm font-medium">Denoise参数</label>
-                <input type="number" id="denoiseValue" value="0.5" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
+
+                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="upscaleEnable" class="w-5 h-5 mr-3">
+                        <h3 class="font-medium">图片放大</h3>
+                    </div>
+                    <button id="upscaleToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleUpscaleContainer()">收起</button>
+                </div>
+
+                <div id="upscaleContent" class="p-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">放大比例</label>
+                            <div class="flex items-center space-x-4">
+                                <select id="upscaleScale" class="bg-gray-700 py-3 px-3 rounded-lg flex-grow" onchange="updateResHint()">
+                                    <option value="1.2">1.2x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.3">1.3x</option>
+                                    <option value="1.35">1.35x</option>
+                                    <option value="1.4">1.4x</option>
+                                    <option value="1.45">1.45x</option>
+                                    <option value="1.5" selected>1.5x</option>
+                                    <option value="1.55">1.55x</option>
+                                    <option value="1.6">1.6x</option>
+                                    <option value="1.65">1.65x</option>
+                                    <option value="1.7">1.7x</option>
+                                    <option value="1.75">1.75x</option>
+                                </select>
+                                <span id="targetRes" class="text-xs text-gray-400 whitespace-nowrap">1356 x 1800</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">Denoise参数</label>
+                            <input type="number" id="denoiseValue" value="0.5" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <!-- 任务进度展示 -->
             <div id="progressContainer" class="col-span-2 hidden space-y-3 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
                 <div class="space-y-1">
                     <div class="flex justify-between text-xs mb-1">
@@ -231,6 +260,9 @@
 
             // 初始化WebSocket连接
             setupWebSocket();
+            
+            // 初始化尺寸选项
+            updateSizeOptions();
 
             console.log('配置加载成功');
         } catch (error) {
@@ -291,9 +323,76 @@
 
     // 分辨率提示更新
     function updateResHint() {
-        const [w, h] = document.getElementById('sizeSelect').value.split(',').map(Number);
+        const ratio = document.getElementById('ratioSelect').value;
         const scale = parseFloat(document.getElementById('upscaleScale').value);
+        let w, h;
+        
+        if (ratio === 'custom') {
+            // 自定义大小：从输入框获取值
+            w = parseInt(document.getElementById('widthInput').value) || 0;
+            h = parseInt(document.getElementById('heightInput').value) || 0;
+        } else {
+            // 预设比例：从下拉框获取值
+            const sizeValue = document.getElementById('sizeSelect').value;
+            [w, h] = sizeValue ? sizeValue.split(',').map(Number) : [0, 0];
+        }
+        
         document.getElementById('targetRes').innerText = `${Math.round(w * scale)} x ${Math.round(h * scale)}`;
+    }
+
+    // 根据选择的比例更新尺寸选项
+    function updateSizeOptions() {
+        const ratio = document.getElementById('ratioSelect').value;
+        const sizeSelect = document.getElementById('sizeSelect');
+        const customSizeInputs = document.getElementById('customSizeInputs');
+        
+        if (ratio === 'custom') {
+            // 自定义大小：隐藏下拉框，显示输入框
+            sizeSelect.classList.add('hidden');
+            customSizeInputs.classList.remove('hidden');
+            
+            // 添加输入框事件监听
+            const widthInput = document.getElementById('widthInput');
+            const heightInput = document.getElementById('heightInput');
+            
+            widthInput.removeEventListener('input', updateResHint);
+            heightInput.removeEventListener('input', updateResHint);
+            
+            widthInput.addEventListener('input', updateResHint);
+            heightInput.addEventListener('input', updateResHint);
+        } else {
+            // 预设比例：显示下拉框，隐藏输入框
+            sizeSelect.classList.remove('hidden');
+            customSizeInputs.classList.add('hidden');
+            
+            sizeSelect.innerHTML = '';
+            
+            // 定义各比例对应的尺寸选项
+            const sizeMap = {
+                '1:1': [
+                    { value: '768,768', text: '768 x 768 (测试)' },
+                    { value: '1024,1024', text: '1024 x 1024' },
+                    { value: '1200,1200', text: '1280 x 1280' }
+                ],
+                '3:4': [
+                    { value: '576,768', text: '576 x 768 (测试)' },
+                    { value: '768,1024', text: '768 x 1024' },
+                    { value: '960,1280', text: '960 x 1280' },
+                    { value: '1200,1600', text: '1200 x 1600' }
+                ],
+            };
+            
+            // 填充尺寸选项
+            sizeMap[ratio].forEach(size => {
+                const option = document.createElement('option');
+                option.value = size.value;
+                option.textContent = size.text;
+                sizeSelect.appendChild(option);
+            });
+        }
+        
+        // 更新分辨率提示
+        updateResHint();
     }
 
     // 主生成逻辑
@@ -323,7 +422,28 @@
 
         try {
             const p = JSON.parse(JSON.stringify(originalWorkflow));
-            const [w, h] = document.getElementById('sizeSelect').value.split(',').map(Number);
+            const ratio = document.getElementById('ratioSelect').value;
+            let w, h;
+            
+            if (ratio === 'custom') {
+                // 自定义大小：从输入框获取值
+                w = parseInt(document.getElementById('widthInput').value);
+                h = parseInt(document.getElementById('heightInput').value);
+                
+                // 验证输入值
+                if (!w || !h || w < 1 || h < 1 || w > 4096 || h > 4096) {
+                    showToast('请输入有效的宽高值（1-4096）');
+                    isGenerating = false;
+                    btn.disabled = false;
+                    btn.classList.add('hover:bg-blue-700');
+                    return;
+                }
+            } else {
+                // 预设比例：从下拉框获取值
+                const sizeValue = document.getElementById('sizeSelect').value;
+                [w, h] = sizeValue ? sizeValue.split(',').map(Number) : [0, 0];
+            }
+            
             const [sampler, scheduler] = document.getElementById('samplerSelect').value.split(',');
             const seed = Math.floor(Math.random() * 1000000000000);
             const batchCount = parseInt(document.getElementById('batchCount').value);
@@ -381,6 +501,11 @@
             btn.disabled = false;
             btn.innerText = originalText;
             btn.classList.add('hover:bg-blue-700');
+            
+            // 所有任务执行完毕后隐藏进度条
+            setTimeout(() => {
+                document.getElementById('progressContainer').classList.add('hidden');
+            }, 2000);
         }
     }
 
@@ -633,8 +758,52 @@
 
             // 图片尺寸
             if (promptData["5"] && promptData["5"].inputs.width && promptData["5"].inputs.height) {
-                const sizeValue = `${promptData["5"].inputs.width},${promptData["5"].inputs.height}`;
-                document.getElementById('sizeSelect').value = sizeValue;
+                const imgWidth = promptData["5"].inputs.width;
+                const imgHeight = promptData["5"].inputs.height;
+                const sizeValue = `${imgWidth},${imgHeight}`;
+                
+                // 定义尺寸映射表
+                const sizeMap = {
+                    '1:1': [
+                        { value: '768,768', text: '768 x 768 (测试)' },
+                        { value: '1024,1024', text: '1024 x 1024' },
+                        { value: '1200,1200', text: '1280 x 1280' }
+                    ],
+                    '3:4': [
+                        { value: '576,768', text: '576 x 768 (测试)' },
+                        { value: '768,1024', text: '768 x 1024' },
+                        { value: '960,1280', text: '960 x 1280' },
+                        { value: '1200,1600', text: '1200 x 1600' }
+                    ],
+                };
+                
+                // 检查是否在预设sizeMap中
+                let foundRatio = null;
+                let foundSize = null;
+                
+                // 遍历sizeMap查找匹配的尺寸
+                Object.keys(sizeMap).forEach(ratio => {
+                    sizeMap[ratio].forEach(size => {
+                        if (size.value === sizeValue) {
+                            foundRatio = ratio;
+                            foundSize = size.value;
+                        }
+                    });
+                });
+                
+                if (foundRatio) {
+                    // 尺寸在预设中：设置对应的比例和尺寸
+                    document.getElementById('ratioSelect').value = foundRatio;
+                    updateSizeOptions(); // 更新尺寸下拉框
+                    document.getElementById('sizeSelect').value = foundSize;
+                } else {
+                    // 尺寸不在预设中：使用自定义大小
+                    document.getElementById('ratioSelect').value = 'custom';
+                    updateSizeOptions(); // 显示自定义输入框
+                    document.getElementById('widthInput').value = imgWidth;
+                    document.getElementById('heightInput').value = imgHeight;
+                }
+                
                 updateResHint(); // 更新目标分辨率提示
             }
 
@@ -721,6 +890,40 @@
             // 展开状态
             textarea.style.height = '400px';
             toggleBtn.textContent = '缩小';
+        }
+    }
+
+    // 控制生成参数容器的展开和收起
+    function toggleParamsContainer() {
+        const content = document.getElementById('paramsContent');
+        const toggleBtn = document.getElementById('paramsToggleBtn');
+
+        // 检查当前是否处于展开状态
+        if (content.style.display === 'none') {
+            // 展开状态
+            content.style.display = 'grid';
+            toggleBtn.textContent = '收起';
+        } else {
+            // 折叠状态
+            content.style.display = 'none';
+            toggleBtn.textContent = '展开';
+        }
+    }
+
+    // 控制图片放大容器的展开和收起
+    function toggleUpscaleContainer() {
+        const content = document.getElementById('upscaleContent');
+        const toggleBtn = document.getElementById('upscaleToggleBtn');
+
+        // 检查当前是否处于展开状态
+        if (content.style.display === 'none') {
+            // 展开状态
+            content.style.display = 'block';
+            toggleBtn.textContent = '收起';
+        } else {
+            // 折叠状态
+            content.style.display = 'none';
+            toggleBtn.textContent = '展开';
         }
     }
 
