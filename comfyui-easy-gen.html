@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DarkBeast API 控制台</title>
+    <title>ZIT-Easy-Use</title>
     <link rel="icon" href="icon.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -16,7 +16,13 @@
 <body class="bg-gray-900 text-white min-h-screen p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto space-y-6">
-        <h1 class="text-2xl font-bold border-b border-gray-700 pb-4">ZIT 控制台</h1>
+        <div class="flex justify-between items-center border-b border-gray-700 pb-4">
+            <h1 class="text-2xl font-bold">ZIT 控制台</h1>
+            <div class="flex space-x-2">
+                <button onclick="window.location.href='history-gallery.html'" class="text-lg hover:bg-gray-700 p-2 rounded">打开相册</button>
+                <button onclick="toggleDrawer()" class="text-lg hover:bg-gray-700 p-2 rounded">生成记录</button>
+            </div>
+        </div>
 
         <div class="grid grid-cols-2 gap-6 bg-gray-800 p-6 rounded-xl shadow-lg">
             <div class="col-span-2">
@@ -142,17 +148,16 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select id="batchCount" class="md:col-span-1 bg-gray-700 py-3 px-3 rounded-lg min-w-[60px]">
-                        <option value="1">1</option><option value="2">2</option>
-                        <option value="4">4</option><option value="8">8</option>
-                        <option value="16">16</option>
-                    </select>
                 <button id="generateBtn" onclick="queuePrompt()" class="md:col-span-2 bg-blue-600 hover:bg-blue-700 py-3 px-4 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed">开始生成</button>
+                <select id="batchCount" class="md:col-span-1 bg-gray-700 py-3 px-3 rounded-lg min-w-[60px]">
+                    <option value="1">1</option><option value="2">2</option>
+                    <option value="4">4</option><option value="8">8</option>
+                    <option value="12">12</option><option value="16">16</option>
+                </select>
             </div>
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-2 gap-3">
                 <button onclick="interruptTask('current')" class="bg-yellow-600 hover:bg-yellow-700 py-3 rounded-lg text-sm">取消当前</button>
                 <button onclick="interruptTask('all')" class="bg-red-600 hover:bg-red-700 py-3 rounded-lg text-sm">清空队列</button>
-                <button onclick="toggleDrawer()" class="bg-purple-600 hover:bg-purple-700 py-3 rounded-lg text-sm">生成记录</button>
             </div>
         </div>
 
@@ -170,7 +175,10 @@
         <div class="fixed top-0 right-0 w-full max-w-[600px] bg-gray-800 border-l border-gray-600 z-50 p-4">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-bold">生成记录</h3>
-                <button onclick="toggleDrawer()" class="text-2xl">&times;</button>
+                <div class="flex space-x-2">
+                    <button onclick="clearHistory()" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">清空记录</button>
+                    <button onclick="toggleDrawer()" class="text-2xl hover:bg-gray-700 p-1 rounded">×</button>
+                </div>
             </div>
         </div>
         <!-- 可滚动的内容区域 -->
@@ -695,6 +703,33 @@
 
     // 点击遮罩关闭抽屉
     document.getElementById('drawerOverlay').addEventListener('click', toggleDrawer);
+    
+    // 清空历史记录
+    async function clearHistory() {
+        if (confirm('是否清空历史记录？')) {
+            try {
+                // 调用ComfyUI API清除历史记录
+                await fetch(`${SERVER}/history`, {
+                    method: 'POST',
+                    body: JSON.stringify({clear: true})
+                });
+                
+                // 清空本地数据和UI
+                displayedTaskIds.clear();
+                historyImages = [];
+                historyImageData = [];
+                document.getElementById('historyList').innerHTML = "";
+                
+                // 重新加载历史记录（应该为空）
+                loadHistory();
+                
+                showToast('历史记录已清空');
+            } catch (error) {
+                console.error('清空历史记录失败:', error);
+                showToast('清空历史记录失败');
+            }
+        }
+    }
     
     // 开始历史记录轮询
     function startHistoryPolling() {
