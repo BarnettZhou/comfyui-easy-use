@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZIT-Easy-Use</title>
-    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="icon" href="resources/icon.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .drawer { transition: transform 0.3s ease-in-out; }
@@ -646,10 +646,10 @@
             newEntries.forEach(entry => {
                 list.insertBefore(entry, list.firstChild);
             });
-            
+
             // 更新历史数组（保持最新的在前面）
-            historyImages = [...newHistoryImages, ...historyImages];
-            historyImageData = [...newHistoryImageData, ...historyImageData];
+            historyImages = [...historyImages, ...newHistoryImages];
+            historyImageData = [...historyImageData, ...newHistoryImageData];
         }
     }
 
@@ -676,7 +676,10 @@
         document.getElementById('nextBtn').classList.remove('hidden');
     }
 
-    function closePreview() { document.getElementById('fullPreview').classList.add('hidden'); }
+    function closePreview() {
+        document.getElementById('fullPreview').classList.add('hidden');
+    }
+
     function toggleDrawer() { 
         const drawer = document.getElementById('drawer');
         const overlay = document.getElementById('drawerOverlay');
@@ -704,7 +707,7 @@
     // 点击遮罩关闭抽屉
     document.getElementById('drawerOverlay').addEventListener('click', toggleDrawer);
     
-    // 清空历史记录
+    // 请求 Comfyui 服务，清空历史记录
     async function clearHistory() {
         if (confirm('是否清空历史记录？')) {
             try {
@@ -730,7 +733,7 @@
             }
         }
     }
-    
+
     // 开始历史记录轮询
     function startHistoryPolling() {
         // 如果已经有定时器在运行，先停止
@@ -740,7 +743,7 @@
         // 每3秒检查一次新任务
         historyPollingTimer = setInterval(loadHistory, 3000);
     }
-    
+
     // 停止历史记录轮询
     function stopHistoryPolling() {
         if (historyPollingTimer) {
@@ -980,7 +983,7 @@
             toast.classList.add('translate-x-full', 'opacity-0');
         }, duration);
     }
-    
+
     // 预览生成结果图片（独立预览，不参与历史导航）
     function openResultPreview(url) {
         const preview = document.getElementById('fullPreview');
