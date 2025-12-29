@@ -19,7 +19,7 @@
         <div class="flex justify-between items-center border-b border-gray-700 pb-4">
             <h1 class="text-2xl font-bold">ZIT 控制台</h1>
             <div class="flex space-x-2">
-                <button onclick="window.location.href='history-gallery.html'" class="text-lg hover:bg-gray-700 p-2 rounded">打开相册</button>
+                <button onclick="window.location.href='/gallery'" class="text-lg hover:bg-gray-700 p-2 rounded">打开相册</button>
                 <button onclick="toggleDrawer()" class="text-lg hover:bg-gray-700 p-2 rounded">生成记录</button>
             </div>
         </div>
@@ -238,11 +238,11 @@
             const configResponse = await fetch('config.json');
             const config = await configResponse.json();
             SERVER = config.SERVER;
-            
+
             // 加载工作流配置
             const workflowResponse = await fetch('original_workflow.json');
             originalWorkflow = await workflowResponse.json();
-            
+
             // 初始化模型下拉选项
             const modelSelect = document.getElementById('modelSelect');
             modelSelect.innerHTML = '';
@@ -252,7 +252,7 @@
                 option.textContent = model;
                 modelSelect.appendChild(option);
             });
-            
+
             // 初始化VAE下拉选项
             const vaeSelect = document.getElementById('vaeSelect');
             vaeSelect.innerHTML = '';

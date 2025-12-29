@@ -18,8 +18,14 @@ const mimeTypes = {
 const server = http.createServer((req, res) => {
     console.log(`${req.method} ${req.url}`);
     
+    // 路由映射
+    const routes = {
+        '/gallery': '/pages/gallery.html',
+        '/history-gallery.html': '/pages/gallery.html' // 保持向后兼容
+    };
+
     // 默认访问index.html
-    let filePath = req.url === '/' ? '/comfyui-easy-gen.html' : req.url;
+    let filePath = routes[req.url] || (req.url === '/' ? '/index.html' : req.url);
     filePath = path.join(__dirname, filePath);
     
     // 获取文件扩展名

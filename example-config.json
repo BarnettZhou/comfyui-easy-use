@@ -6,5 +6,8 @@
     "vae_models": [
         "ae.safetensors"
     ],
+    "loras": [
+        "pixel_art_style_z_image_turbo.safetensors"
+    ],
     "prefix": "zit"
 }
