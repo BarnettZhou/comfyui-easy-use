@@ -33,15 +33,12 @@
                 <textarea id="promptText" rows="3" class="w-full bg-gray-700 rounded p-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
             </div>
 
-            <!-- 可折叠的生成参数容器 -->
             <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
-                <!-- 标题和展开/收起按钮 -->
                 <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
-                    <h3 class="font-medium">生成参数</h3>
-                    <button id="paramsToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleParamsContainer()">收起</button>
+                    <h3 class="font-medium">模型选择</h3>
+                    <button id="modelsToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleModelsContainer()">收起</button>
                 </div>
-                <!-- 参数表单项 -->
-                <div id="paramsContent" class="p-4 grid sm:grid-cols-2 gap-4">
+                <div id="modelsContent" class="p-4 grid sm:grid-cols-2 gap-4" style="display: none;">
                     <div>
                         <label class="block mb-2 text-sm font-medium">模型</label>
                         <select id="modelSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
@@ -51,14 +48,29 @@
                         <label class="block mb-2 text-sm font-medium">VAE</label>
                         <select id="vaeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
                     </div>
+                </div>
+            </div>
 
+            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
+                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
+                    <h3 class="font-medium">生成参数</h3>
+                    <button id="paramsToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleParamsContainer()">展开</button>
+                </div>
+                <div id="paramsContent" class="p-4 grid sm:grid-cols-2 gap-4" style="display: none;">
                     <div>
                         <label class="block mb-2 text-sm font-medium">采样器组合</label>
                         <select id="samplerSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
                             <option value="er_sde,sgm_uniform">er_sde + sgm_uniform</option>
                             <option value="er_sde,simple">er_sde + simple</option>
                             <option value="res_multistep,simple">res_multistep + simple</option>
+                            <option value="euler,simple">euler + simple</option>
+                            <option value="dpmpp_2s_ancestral,FlowMatchEulerDiscreteScheduler">dpmpp_2s_ancestral + FlowMatchEulerDiscreteScheduler</option>
                         </select>
+                    </div>
+
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">CFG</label>
+                        <input type="number" id="cfgInput" value="1" min="0.1" max="20" step="0.1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
                     </div>
 
                     <div>
@@ -79,9 +91,41 @@
                             <input type="number" id="heightInput" placeholder="高度" min="1" max="4096" class="bg-gray-700 py-3 px-3 rounded-lg">
                         </div>
                     </div>
+
+                    <div>
+                        <label class="block mb-2 text-sm font-medium">步数</label>
+                        <input type="number" id="stepsInput" value="9" min="8" max="20" step="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                    </div>
                 </div>
             </div>
 
+            <!-- LoRAs 设置 -->
+            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
+                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="loraEnable" class="w-5 h-5 mr-3">
+                        <h3 class="font-medium">LoRAs</h3>
+                    </div>
+                    <button id="loraToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleLoraContainer()">展开</button>
+                </div>
+                <div id="loraContent" class="p-4" style="display: none;">
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">LoRA模型</label>
+                            <select id="loraModel" class="bg-gray-700 py-3 px-3 rounded-lg w-full">
+                                <!-- 选项将从config.json动态加载 -->
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">模型强度</label>
+                            <input type="number" id="loraStrength" value="0.8" step="0.05" min="0" max="2" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图片放大 -->
             <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
 
                 <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
@@ -89,7 +133,7 @@
                         <input type="checkbox" id="upscaleEnable" class="w-5 h-5 mr-3">
                         <h3 class="font-medium">图片放大</h3>
                     </div>
-                    <button id="upscaleToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleUpscaleContainer()">收起</button>
+                    <button id="upscaleToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleUpscaleContainer()">展开</button>
                 </div>
 
                 <div id="upscaleContent" class="p-4" style="display: none;">
@@ -240,7 +284,7 @@
             SERVER = config.SERVER;
 
             // 加载工作流配置
-            const workflowResponse = await fetch('original_workflow.json');
+            const workflowResponse = await fetch('original_workflow_lora.json');
             originalWorkflow = await workflowResponse.json();
 
             // 初始化模型下拉选项
@@ -261,6 +305,16 @@
                 option.value = vae;
                 option.textContent = vae;
                 vaeSelect.appendChild(option);
+            });
+
+            // 初始化LoRA模型下拉选项
+            const loraSelect = document.getElementById('loraModel');
+            loraSelect.innerHTML = '';
+            config.loras.forEach(lora => {
+                const option = document.createElement('option');
+                option.value = lora;
+                option.textContent = lora;
+                loraSelect.appendChild(option);
             });
 
             // 文件保存设置
@@ -416,7 +470,7 @@
 
         isGenerating = true;
         shouldStop = false;
-        clearOnNextRender = true; 
+        clearOnNextRender = true;
         
         // 显示进度条并重置进度
         document.getElementById('progressContainer').classList.remove('hidden');
@@ -463,6 +517,8 @@
             p["3"].inputs.seed = seed;
             p["3"].inputs.sampler_name = sampler;
             p["3"].inputs.scheduler = scheduler;
+            p["3"].inputs.cfg = parseFloat(document.getElementById('cfgInput').value);
+            p["3"].inputs.steps = parseInt(document.getElementById('stepsInput').value);
             
             // 模型和VAE参数
             p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
@@ -482,6 +538,19 @@
                 p["40"].inputs.sampler_name = sampler;
                 p["40"].inputs.scheduler = scheduler;
                 p["40"].inputs.denoise = parseFloat(document.getElementById('denoiseValue').value);
+                p["40"].inputs.cfg = parseFloat(document.getElementById('cfgInput').value);
+                p["40"].inputs.steps = parseInt(document.getElementById('stepsInput').value);
+            }
+
+            // LoRA处理
+            if(document.getElementById('loraEnable').checked) {
+                p["44"].inputs.lora_name = document.getElementById('loraModel').value;
+                p["44"].inputs.strength_model = parseFloat(document.getElementById('loraStrength').value);
+                p["25"].inputs.shift = 22; // mystic-xxx-zit-v2 的特殊参数
+            } else {
+                delete p["44"];
+                p["25"].inputs.shift = 3;
+                p["25"].inputs.model = ["34", 0]
             }
 
             for(let i = 0; i < batchCount; i++) {
@@ -794,6 +863,16 @@
                 document.getElementById('vaeSelect').value = promptData["32"].inputs.vae_name;
             }
 
+            // CFG
+            if (promptData["3"] && promptData["3"].inputs.cfg) {
+                document.getElementById('cfgInput').value = promptData["3"].inputs.cfg;
+            }
+
+            // 步数
+            if (promptData["3"] && promptData["3"].inputs.steps) {
+                document.getElementById('stepsInput').value = promptData["3"].inputs.steps;
+            }
+
             // 图片尺寸
             if (promptData["5"] && promptData["5"].inputs.width && promptData["5"].inputs.height) {
                 const imgWidth = promptData["5"].inputs.width;
@@ -858,6 +937,14 @@
                 updateResHint(); // 更新目标分辨率提示
             } else {
                 document.getElementById('upscaleEnable').checked = false;
+            }
+
+            if (promptData["44"]) {
+                document.getElementById('loraEnable').checked = true;
+                document.getElementById('loraModel').value = promptData["44"].inputs.lora_name;
+                document.getElementById('loraStrength').value = promptData["44"].inputs.strength_model;
+            } else {
+                document.getElementById('loraEnable').checked = false;
             }
 
             // Denoise参数
@@ -931,6 +1018,21 @@
         }
     }
 
+    function toggleModelsContainer() {
+        const content = document.getElementById('modelsContent');
+        const toggleBtn = document.getElementById('modelsToggleBtn');
+        // 检查当前是否处于展开状态
+        if (content.style.display === 'none') {
+            // 展开状态
+            content.style.display = 'grid';
+            toggleBtn.textContent = '收起';
+        } else {
+            // 折叠状态
+            content.style.display = 'none';
+            toggleBtn.textContent = '展开';
+        }
+    }
+
     // 控制生成参数容器的展开和收起
     function toggleParamsContainer() {
         const content = document.getElementById('paramsContent');
@@ -952,6 +1054,23 @@
     function toggleUpscaleContainer() {
         const content = document.getElementById('upscaleContent');
         const toggleBtn = document.getElementById('upscaleToggleBtn');
+
+        // 检查当前是否处于展开状态
+        if (content.style.display === 'none') {
+            // 展开状态
+            content.style.display = 'block';
+            toggleBtn.textContent = '收起';
+        } else {
+            // 折叠状态
+            content.style.display = 'none';
+            toggleBtn.textContent = '展开';
+        }
+    }
+
+    // 控制LoRAs容器的展开和收起
+    function toggleLoraContainer() {
+        const content = document.getElementById('loraContent');
+        const toggleBtn = document.getElementById('loraToggleBtn');
 
         // 检查当前是否处于展开状态
         if (content.style.display === 'none') {
