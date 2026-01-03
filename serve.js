@@ -1,6 +1,32 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+
+// 获取局域网IP地址
+function getLocalIP() {
+    const interfaces = os.networkInterfaces();
+    
+    for (const name of Object.keys(interfaces)) {
+        for (const net of interfaces[name]) {
+            // 跳过IPv6和回环地址
+            if (net.family === 'IPv4' && !net.internal) {
+                // 检查是否为标准私有IPv4地址（适用于所有局域网环境）
+                // 私有网段：10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+                if (
+                    net.address.startsWith('10.') ||
+                    (net.address.startsWith('172.') && parseInt(net.address.split('.')[1]) >= 16 && parseInt(net.address.split('.')[1]) <= 31) ||
+                    net.address.startsWith('192.168.')
+                ) {
+                    return net.address;
+                }
+            }
+        }
+    }
+    
+    // 如果没有找到私有IP地址，返回本地地址
+    return '127.0.0.1';
+}
 
 // 服务器配置
 const PORT = 11451;
@@ -54,7 +80,8 @@ const server = http.createServer((req, res) => {
 
 // 启动服务器
 server.listen(PORT, HOST, () => {
+    const localIP = getLocalIP();
     console.log(`Server running at http://${HOST}:${PORT}/`);
     console.log('Local access: http://localhost:11451/');
-    console.log('LAN access: http://<your-ip>:11451/');
+    console.log(`LAN access: http://${localIP}:11451/`);
 });
