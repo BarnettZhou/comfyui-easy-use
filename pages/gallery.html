@@ -18,6 +18,10 @@
         <div class="flex justify-between items-center border-b border-gray-700 pb-4">
             <h1 class="text-2xl font-bold">历史图片画廊</h1>
             <div class="flex space-x-2">
+                <button id="autoRefreshToggle" onclick="toggleAutoRefresh()" class="text-lg bg-gray-600 hover:bg-gray-700 p-2 rounded flex items-center">
+                    <span id="autoRefreshText">自动刷新</span>
+                    <span id="autoRefreshStatus" class="ml-1 text-xs bg-red-500 px-2 py-0.5 rounded">关闭</span>
+                </button>
                 <button onclick="window.location.href='/'" class="text-lg hover:bg-gray-700 p-2 rounded">返回控制台</button>
                 <button id="refreshBtn" onclick="refreshHistory()" class="text-lg bg-blue-600 hover:bg-blue-700 p-2 rounded flex items-center">
                     <span>刷新</span>
@@ -64,6 +68,8 @@
     let currentPreviewIndex = 0; // 当前预览图片的索引 
     let currentTaskId = null;   // 当前预览图片的任务ID
     let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
+    let historyPollingTimer = null; // 历史记录轮询定时器
+    let isAutoRefreshEnabled = false; // 自动刷新状态
 
     // 初始化时加载配置
     async function initConfig() {
@@ -263,6 +269,47 @@
             }
         }
     });
+
+    // 开始历史记录轮询
+    function startHistoryPolling() {
+        // 如果已经有定时器在运行，先停止
+        if (historyPollingTimer) {
+            clearInterval(historyPollingTimer);
+        }
+        // 每3秒检查一次新任务
+        historyPollingTimer = setInterval(loadHistory, 3000);
+    }
+
+    // 停止历史记录轮询
+    function stopHistoryPolling() {
+        if (historyPollingTimer) {
+            clearInterval(historyPollingTimer);
+            historyPollingTimer = null;
+        }
+    }
+
+    // 切换自动刷新状态
+    function toggleAutoRefresh() {
+        isAutoRefreshEnabled = !isAutoRefreshEnabled;
+        const statusElement = document.getElementById('autoRefreshStatus');
+        const toggleButton = document.getElementById('autoRefreshToggle');
+        
+        if (isAutoRefreshEnabled) {
+            // 开启自动刷新
+            statusElement.textContent = '开启';
+            statusElement.className = 'ml-1 text-xs bg-green-500 px-2 py-0.5 rounded';
+            toggleButton.className = 'text-lg bg-green-600 hover:bg-green-700 p-2 rounded flex items-center';
+            startHistoryPolling();
+            showToast('已开启自动刷新');
+        } else {
+            // 关闭自动刷新
+            statusElement.textContent = '关闭';
+            statusElement.className = 'ml-1 text-xs bg-red-500 px-2 py-0.5 rounded';
+            toggleButton.className = 'text-lg bg-gray-600 hover:bg-gray-700 p-2 rounded flex items-center';
+            stopHistoryPolling();
+            showToast('已关闭自动刷新');
+        }
+    }
 
     // Toast通知函数
     function showToast(message, duration = 3000) {
