@@ -1,5 +1,5 @@
 {
-    "PORT": 8000,
+    "port": 8000,
     "diffusion_models": [
         "z_image_turbo_bf16.safetensors"
     ],
