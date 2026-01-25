@@ -1,13 +1,18 @@
 let SERVER;
 let originalWorkflow;
 let config;
+let localIP;
 
 // 获取本地IP地址
 async function getLocalIPFromServer() {
+    if (localIP) {
+        return localIP;
+    }
+
     try {
         const response = await fetch('/api/local-ip');
         const data = await response.json();
-        return data.localIP;
+        localIP = data.localIP;
     } catch (error) {
         console.error('获取本地IP失败:', error);
         return null;
