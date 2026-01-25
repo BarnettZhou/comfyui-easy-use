@@ -1,7 +1,3 @@
-// 配置从外部JSON文件加载
-let SERVER;
-let originalWorkflow;
-
 // 全局状态控制
 let isGenerating = false;
 let shouldStop = false;
@@ -58,24 +54,30 @@ async function getLocalIPFromServer() {
     }
 }
 
-// 初始化时加载配置
-async function initConfig() {
+// 初始化原始工作流
+async function initOriginalWorkflow() {
+    if (!SERVER) {
+        await initServerConfig();
+    }
+
     try {
-        // 加载服务器配置
-        const configResponse = await fetch('config.json');
-        const config = await configResponse.json();
-        // SERVER = config.SERVER;
-
-        // 获取本地IP地址
-        const localIP = await getLocalIPFromServer();
-        console.log('本地IP地址:', localIP);
-        const port = config.PORT;
-        SERVER = `http://${localIP}:${port}`;
-
-        // 加载工作流配置
-        const workflowResponse = await fetch('original_workflow_lora.json');
+        // 加载原始工作流
+        const workflowResponse = await fetch('../original_workflow_lora.json');
         originalWorkflow = await workflowResponse.json();
+        console.log('原始工作流:', originalWorkflow);
+    } catch (error) {
+        console.error('加载原始工作流失败:', error);
+        showToast('加载原始工作流失败，请检查服务器是否正常运行');
+    }
+}
 
+// 初始化时加载配置
+async function initGeneratorForm() {
+    if (!config) {
+        await initServerConfig();
+    }
+
+    try {
         // 初始化模型下拉选项
         const modelSelect = document.getElementById('modelSelect');
         modelSelect.innerHTML = '';
@@ -186,7 +188,11 @@ function resetProgress() {
 }
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', initConfig);
+document.addEventListener('DOMContentLoaded', function() {
+    initServerConfig();
+    initOriginalWorkflow();
+    initGeneratorForm();
+});
 
 // 分辨率提示更新
 function updateResHint() {

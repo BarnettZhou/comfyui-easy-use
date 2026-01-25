@@ -46,6 +46,7 @@ const server = http.createServer((req, res) => {
     
     // 路由映射
     const routes = {
+        '/': '/pages/index.html',
         '/gallery': '/pages/gallery.html',
         '/history-gallery.html': '/pages/gallery.html', // 保持向后兼容
         '/api/local-ip': '/api/local-ip' // 添加IP获取接口
@@ -58,8 +59,8 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // 默认访问index.html
-    let filePath = routes[req.url] || (req.url === '/' ? '/index.html' : req.url);
+    // 处理文件路径
+    let filePath = routes[req.url] || req.url;
     filePath = path.join(__dirname, filePath);
     
     // 获取文件扩展名
