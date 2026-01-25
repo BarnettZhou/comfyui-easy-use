@@ -9,5 +9,20 @@
     "loras": [
         "pixel_art_style_z_image_turbo.safetensors"
     ],
-    "prefix": "zit"
+    "prefix": "zit",
+    "size_map": {
+        "1:1": [
+            { "value": "1024,1024", "text": "1024 x 1024" },
+            { "value": "1200,1200", "text": "1280 x 1280" }
+        ],
+        "3:4": [
+            { "value": "960,1280", "text": "960 x 1280" },
+            { "value": "1080,1440", "text": "1080 x 1440" },
+            { "value": "1200,1600", "text": "1200 x 1600" }
+        ]
+    },
+    "sampler_options": [
+        { "value": "er_sde,sgm_uniform", "text": "er_sde + sgm_uniform" },
+        { "value": "euler,sgm_uniform", "text": "euler + sgm_uniform" }
+    ]
 }

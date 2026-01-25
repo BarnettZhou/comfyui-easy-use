@@ -11,23 +11,6 @@ let historyPollingTimer = null; // 历史记录轮询定时器
 let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
 let socket; // WebSocket 实例，用于监听进度更新
 
-// 尺寸选项映射
-const sizeMap = {
-    '1:1': [
-        { value: '768,768', text: '768 x 768 (测试)' },
-        { value: '1024,1024', text: '1024 x 1024' },
-        { value: '1200,1200', text: '1280 x 1280' }
-    ],
-    '3:4': [
-        { value: '576,768', text: '576 x 768 (测试)' },
-        { value: '768,1024', text: '768 x 1024' },
-        { value: '960,1280', text: '960 x 1280' },
-        { value: '1080,1440', text: '1080 x 1440' },
-        { value: '1152,1536', text: '1152 x 1536' },
-        { value: '1200,1600', text: '1200 x 1600' }
-    ],
-};
-
 // 采样器选项映射
 const samplerOptions = [
     { value: 'er_sde,sgm_uniform', text: 'er_sde + sgm_uniform(黑兽)' },
@@ -57,10 +40,6 @@ async function initOriginalWorkflow() {
 
 // 初始化时加载配置
 async function initConsole() {
-    if (!config) {
-        await initServerConfig();
-    }
-
     try {
         // 初始化模型下拉选项
         const modelSelect = document.getElementById('modelSelect');
@@ -95,7 +74,7 @@ async function initConsole() {
         // 初始化采样器组合下拉选项
         const samplerSelect = document.getElementById('samplerSelect');
         samplerSelect.innerHTML = '';
-        samplerOptions.forEach(option => {
+        config.sampler_options.forEach(option => {
             const opt = document.createElement('option');
             opt.value = option.value;
             opt.textContent = option.text;
@@ -107,7 +86,7 @@ async function initConsole() {
 
         // 初始化WebSocket连接
         setupWebSocket();
-        
+
         // 初始化尺寸选项
         updateSizeOptions();
 
@@ -197,6 +176,11 @@ function updateResHint() {
     document.getElementById('targetRes').innerText = `${Math.round(w * scale)} x ${Math.round(h * scale)}`;
 }
 
+// 获取尺寸映射
+function getSizeMap() {
+    return config.size_map;
+}
+
 // 根据选择的比例更新尺寸选项
 function updateSizeOptions() {
     const ratio = document.getElementById('ratioSelect').value;
@@ -221,10 +205,11 @@ function updateSizeOptions() {
         // 预设比例：显示下拉框，隐藏输入框
         sizeSelect.classList.remove('hidden');
         customSizeInputs.classList.add('hidden');
-        
+
         sizeSelect.innerHTML = '';
-        
+
         // 填充尺寸选项
+        const sizeMap = getSizeMap();
         sizeMap[ratio].forEach(size => {
             const option = document.createElement('option');
             option.value = size.value;
@@ -673,6 +658,9 @@ async function sendToConsole() {
             let foundRatio = null;
             let foundSize = null;
             
+            // 获取尺寸映射
+            const sizeMap = await getSizeMap();
+
             // 遍历sizeMap查找匹配的尺寸
             Object.keys(sizeMap).forEach(ratio => {
                 sizeMap[ratio].forEach(size => {
