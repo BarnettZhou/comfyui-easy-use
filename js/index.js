@@ -42,24 +42,8 @@ const samplerOptions = [
 // 页面卸载时停止轮询
 window.addEventListener('beforeunload', stopHistoryPolling);
 
-// 获取本地IP地址
-async function getLocalIPFromServer() {
-    try {
-        const response = await fetch('/api/local-ip');
-        const data = await response.json();
-        return data.localIP;
-    } catch (error) {
-        console.error('获取本地IP失败:', error);
-        return null;
-    }
-}
-
 // 初始化原始工作流
 async function initOriginalWorkflow() {
-    if (!SERVER) {
-        await initServerConfig();
-    }
-
     try {
         // 加载原始工作流
         const workflowResponse = await fetch('../original_workflow_lora.json');
@@ -72,7 +56,7 @@ async function initOriginalWorkflow() {
 }
 
 // 初始化时加载配置
-async function initGeneratorForm() {
+async function initConsole() {
     if (!config) {
         await initServerConfig();
     }
@@ -188,10 +172,10 @@ function resetProgress() {
 }
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', function() {
-    initServerConfig();
+document.addEventListener('DOMContentLoaded', async function() {
+    await initServerConfig();
     initOriginalWorkflow();
-    initGeneratorForm();
+    initConsole();
 });
 
 // 分辨率提示更新

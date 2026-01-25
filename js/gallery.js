@@ -8,9 +8,10 @@ let historyPollingTimer = null; // 历史记录轮询定时器
 let isAutoRefreshEnabled = false; // 自动刷新状态
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', function() {
-    initServerConfig();
-    
+document.addEventListener('DOMContentLoaded', async function() {
+    await initServerConfig();
+    loadHistory();
+
     // 添加点击遮罩关闭预览功能
     const fullPreview = document.getElementById('fullPreview');
     fullPreview.addEventListener('click', function(event) {
@@ -23,6 +24,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 加载历史记录
 async function loadHistory() {
+    if(!SERVER) {
+        await initServerConfig();
+    }
+
     const res = await fetch(`${SERVER}/history`);
     const data = await res.json();
     const gallery = document.getElementById('historyGallery');

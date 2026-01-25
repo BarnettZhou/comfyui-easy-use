@@ -1,18 +1,14 @@
 let SERVER;
 let originalWorkflow;
 let config;
-let localIP;
 
 // 获取本地IP地址
 async function getLocalIPFromServer() {
-    if (localIP) {
-        return localIP;
-    }
-
     try {
         const response = await fetch('/api/local-ip');
         const data = await response.json();
-        localIP = data.localIP;
+        const localIP = data.localIP;
+        return localIP;
     } catch (error) {
         console.error('获取本地IP失败:', error);
         return null;
@@ -32,8 +28,7 @@ async function initServerConfig() {
         const port = config.PORT;
         SERVER = `http://${localIP}:${port}`;
 
-        // 加载历史记录
-        await loadHistory();
+        console.log('服务器地址:', SERVER);
     } catch (error) {
         console.error('加载配置文件失败:', error);
         showToast('加载配置失败，请检查服务器是否正常运行');
