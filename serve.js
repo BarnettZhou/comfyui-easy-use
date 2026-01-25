@@ -47,8 +47,16 @@ const server = http.createServer((req, res) => {
     // 路由映射
     const routes = {
         '/gallery': '/pages/gallery.html',
-        '/history-gallery.html': '/pages/gallery.html' // 保持向后兼容
+        '/history-gallery.html': '/pages/gallery.html', // 保持向后兼容
+        '/api/local-ip': '/api/local-ip' // 添加IP获取接口
     };
+
+    // 处理API请求
+    if (req.url === '/api/local-ip') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ localIP: getLocalIP() }), 'utf-8');
+        return;
+    }
 
     // 默认访问index.html
     let filePath = routes[req.url] || (req.url === '/' ? '/index.html' : req.url);

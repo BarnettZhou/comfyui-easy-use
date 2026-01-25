@@ -15,8 +15,48 @@ let historyPollingTimer = null; // 历史记录轮询定时器
 let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
 let socket; // WebSocket 实例，用于监听进度更新
 
+// 尺寸选项映射
+const sizeMap = {
+    '1:1': [
+        { value: '768,768', text: '768 x 768 (测试)' },
+        { value: '1024,1024', text: '1024 x 1024' },
+        { value: '1200,1200', text: '1280 x 1280' }
+    ],
+    '3:4': [
+        { value: '576,768', text: '576 x 768 (测试)' },
+        { value: '768,1024', text: '768 x 1024' },
+        { value: '960,1280', text: '960 x 1280' },
+        { value: '1080,1440', text: '1080 x 1440' },
+        { value: '1152,1536', text: '1152 x 1536' },
+        { value: '1200,1600', text: '1200 x 1600' }
+    ],
+};
+
+// 采样器选项映射
+const samplerOptions = [
+    { value: 'er_sde,sgm_uniform', text: 'er_sde + sgm_uniform(黑兽)' },
+    { value: 'euler,sgm_uniform', text: 'euler + sgm_uniform(黑兽)' },
+    { value: 'er_sde,simple', text: 'er_sde + simple' },
+    { value: 'res_multistep,simple', text: 'res_multistep + simple' },
+    { value: 'euler,simple', text: 'euler + simple(BEYOND)' },
+    { value: 'dpmpp_2m,beta', text: 'dpmpp_2m + beta(unStable)' },
+    { value: 'dpmpp_2s_ancestral,FlowMatchEulerDiscreteScheduler', text: 'dpmpp_2s_ancestral + FlowMatchEulerDiscreteScheduler' }
+];
+
 // 页面卸载时停止轮询
 window.addEventListener('beforeunload', stopHistoryPolling);
+
+// 获取本地IP地址
+async function getLocalIPFromServer() {
+    try {
+        const response = await fetch('/api/local-ip');
+        const data = await response.json();
+        return data.localIP;
+    } catch (error) {
+        console.error('获取本地IP失败:', error);
+        return null;
+    }
+}
 
 // 初始化时加载配置
 async function initConfig() {
@@ -24,7 +64,13 @@ async function initConfig() {
         // 加载服务器配置
         const configResponse = await fetch('config.json');
         const config = await configResponse.json();
-        SERVER = config.SERVER;
+        // SERVER = config.SERVER;
+
+        // 获取本地IP地址
+        const localIP = await getLocalIPFromServer();
+        console.log('本地IP地址:', localIP);
+        const port = config.PORT;
+        SERVER = `http://${localIP}:${port}`;
 
         // 加载工作流配置
         const workflowResponse = await fetch('original_workflow_lora.json');
@@ -58,6 +104,16 @@ async function initConfig() {
             option.value = lora;
             option.textContent = lora;
             loraSelect.appendChild(option);
+        });
+
+        // 初始化采样器组合下拉选项
+        const samplerSelect = document.getElementById('samplerSelect');
+        samplerSelect.innerHTML = '';
+        samplerOptions.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.value;
+            opt.textContent = option.text;
+            samplerSelect.appendChild(opt);
         });
 
         // 文件保存设置
@@ -177,21 +233,6 @@ function updateSizeOptions() {
         customSizeInputs.classList.add('hidden');
         
         sizeSelect.innerHTML = '';
-        
-        // 定义各比例对应的尺寸选项
-        const sizeMap = {
-            '1:1': [
-                { value: '768,768', text: '768 x 768 (测试)' },
-                { value: '1024,1024', text: '1024 x 1024' },
-                { value: '1200,1200', text: '1280 x 1280' }
-            ],
-            '3:4': [
-                { value: '576,768', text: '576 x 768 (测试)' },
-                { value: '768,1024', text: '768 x 1024' },
-                { value: '960,1280', text: '960 x 1280' },
-                { value: '1200,1600', text: '1200 x 1600' }
-            ],
-        };
         
         // 填充尺寸选项
         sizeMap[ratio].forEach(size => {
@@ -637,21 +678,6 @@ async function sendToConsole() {
             const imgWidth = promptData["5"].inputs.width;
             const imgHeight = promptData["5"].inputs.height;
             const sizeValue = `${imgWidth},${imgHeight}`;
-            
-            // 定义尺寸映射表
-            const sizeMap = {
-                '1:1': [
-                    { value: '768,768', text: '768 x 768 (测试)' },
-                    { value: '1024,1024', text: '1024 x 1024' },
-                    { value: '1200,1200', text: '1280 x 1280' }
-                ],
-                '3:4': [
-                    { value: '576,768', text: '576 x 768 (测试)' },
-                    { value: '768,1024', text: '768 x 1024' },
-                    { value: '960,1280', text: '960 x 1280' },
-                    { value: '1200,1600', text: '1200 x 1600' }
-                ],
-            };
             
             // 检查是否在预设sizeMap中
             let foundRatio = null;
