@@ -1,213 +1,227 @@
 {
-    "3": {
-        "inputs": {
-            "seed": 914642622064415,
-            "steps": 9,
-            "cfg": 1,
-            "sampler_name": "er_sde",
-            "scheduler": "sgm_uniform",
-            "denoise": 1,
-            "model": [
-                "25",
-                0
-            ],
-            "positive": [
-                "6",
-                0
-            ],
-            "negative": [
-                "11",
-                0
-            ],
-            "latent_image": [
-                "5",
-                0
-            ]
-        },
-        "class_type": "KSampler",
-        "_meta": {
-            "title": "初步采样"
-        }
+  "3": {
+    "inputs": {
+      "seed": 914642622064415,
+      "steps": 9,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "sgm_uniform",
+      "denoise": 1,
+      "model": [
+        "25",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
     },
-    "5": {
-        "inputs": {
-            "width": 904,
-            "height": 1200,
-            "batch_size": 1
-        },
-        "class_type": "EmptyLatentImage",
-        "_meta": {
-            "title": "空Latent图像"
-        }
-    },
-    "6": {
-        "inputs": {
-            "text": "",
-            "clip": [
-                "30",
-                0
-            ]
-        },
-        "class_type": "CLIPTextEncode",
-        "_meta": {
-            "title": "提示词"
-        }
-    },
-    "8": {
-        "inputs": {
-            "samples": [
-                "3",
-                0
-            ],
-            "vae": [
-                "32",
-                0
-            ]
-        },
-        "class_type": "VAEDecode",
-        "_meta": {
-            "title": "初步解码"
-        }
-    },
-    "9": {
-        "inputs": {
-            "filename_prefix": "dark-beast/2025-12-27/db-zit",
-            "images": [
-                "8",
-                0
-            ]
-        },
-        "class_type": "SaveImage",
-        "_meta": {
-            "title": "初步图像"
-        }
-    },
-    "11": {
-        "inputs": {
-            "conditioning": [
-                "6",
-                0
-            ]
-        },
-        "class_type": "ConditioningZeroOut",
-        "_meta": {
-            "title": "条件零化"
-        }
-    },
-    "25": {
-        "inputs": {
-            "shift": 3,
-            "model": [
-                "34",
-                0
-            ]
-        },
-        "class_type": "ModelSamplingAuraFlow",
-        "_meta": {
-            "title": "采样算法（AuraFlow）"
-        }
-    },
-    "30": {
-        "inputs": {
-            "clip_name": "qwen_3_4b.safetensors",
-            "type": "lumina2",
-            "device": "default"
-        },
-        "class_type": "CLIPLoader",
-        "_meta": {
-            "title": "加载CLIP"
-        }
-    },
-    "32": {
-        "inputs": {
-            "vae_name": "dark-beast-ae.sft"
-        },
-        "class_type": "VAELoader",
-        "_meta": {
-            "title": "加载VAE"
-        }
-    },
-    "34": {
-        "inputs": {
-            "unet_name": "darkBeastZDBZUpdatedDEC21_dbzAIOV10.safetensors",
-            "weight_dtype": "default"
-        },
-        "class_type": "UNETLoader",
-        "_meta": {
-            "title": "UNet加载器"
-        }
-    },
-    "38": {
-        "inputs": {
-            "upscale_method": "bislerp",
-            "scale_by": 1.5,
-            "samples": [
-                "3",
-                0
-            ]
-        },
-        "class_type": "LatentUpscaleBy",
-        "_meta": {
-            "title": "缩放Latent"
-        }
-    },
-    "39": {
-        "inputs": {
-            "samples": [
-                "40",
-                0
-            ],
-            "vae": [
-                "32",
-                0
-            ]
-        },
-        "class_type": "VAEDecode",
-        "_meta": {
-            "title": "最终解码"
-        }
-    },
-    "40": {
-        "inputs": {
-            "seed": 914642622064415,
-            "steps": 9,
-            "cfg": 1,
-            "sampler_name": "er_sde",
-            "scheduler": "sgm_uniform",
-            "denoise": 0.8,
-            "model": [
-                "34",
-                0
-            ],
-            "positive": [
-                "6",
-                0
-            ],
-            "negative": [
-                "11",
-                0
-            ],
-            "latent_image": [
-                "38",
-                0
-            ]
-        },
-        "class_type": "KSampler",
-        "_meta": {
-            "title": "二次采样"
-        }
-    },
-    "42": {
-        "inputs": {
-            "filename_prefix": "",
-            "images": [
-                "39",
-                0
-            ]
-        },
-        "class_type": "SaveImage",
-        "_meta": {
-            "title": "最终图像"
-        }
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "初步采样"
     }
+  },
+  "5": {
+    "inputs": {
+      "width": 904,
+      "height": 1200,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "空Latent图像"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "提示词"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "初步解码"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "dark-beast/2025-12-29/db-zit",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "初步图像"
+    }
+  },
+  "11": {
+    "inputs": {
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "条件零化"
+    }
+  },
+  "25": {
+    "inputs": {
+      "shift": 3,
+      "model": [
+        "44",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "采样算法（AuraFlow）"
+    }
+  },
+  "30": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载CLIP"
+    }
+  },
+  "32": {
+    "inputs": {
+      "vae_name": "dark-beast-ae.sft"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
+  },
+  "34": {
+    "inputs": {
+      "unet_name": "darkBeastZDBZUpdatedDEC21_dbzAIOV10.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
+  },
+  "38": {
+    "inputs": {
+      "upscale_method": "bislerp",
+      "scale_by": 1.5,
+      "samples": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "LatentUpscaleBy",
+    "_meta": {
+      "title": "缩放Latent"
+    }
+  },
+  "39": {
+    "inputs": {
+      "samples": [
+        "40",
+        0
+      ],
+      "vae": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "最终解码"
+    }
+  },
+  "40": {
+    "inputs": {
+      "seed": 914642622064415,
+      "steps": 9,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "sgm_uniform",
+      "denoise": 0.8,
+      "model": [
+        "25",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "38",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "二次采样"
+    }
+  },
+  "42": {
+    "inputs": {
+      "filename_prefix": "dark-beast/2025-12-29/db-zit",
+      "images": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "最终图像"
+    }
+  },
+  "44": {
+    "inputs": {
+      "lora_name": "Mystic-XXX-ZIT-v2.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Lora加载"
+    }
+  }
 }

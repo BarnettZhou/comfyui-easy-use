@@ -3,62 +3,292 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>历史图片画廊</title>
-    <link rel="icon" href="resources/icon.png" type="image/png">
+    <title>历史图片画廊 - ZIT-Easy-Use</title>
+    <link rel="icon" href="../resources/icon.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        .drawer { transition: transform 0.3s ease-in-out; }
-        .drawer-closed { transform: translateX(100%); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* 玻璃拟态效果 */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.7);
+        }
+        
+        /* 卡片悬停效果 */
+        .card-hover {
+            transition: all 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+        }
+        .dark .card-hover:hover {
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* 图片加载占位 */
+        .img-skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        .dark .img-skeleton {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* 文本多行截断 */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-4 md:p-8">
-    <div class="max-w-7xl mx-auto space-y-6">
-        <div class="flex justify-between items-center border-b border-gray-700 pb-4">
-            <h1 class="text-2xl font-bold">历史图片画廊</h1>
-            <div class="flex space-x-2">
-                <button id="autoRefreshToggle" onclick="toggleAutoRefresh()" class="text-lg bg-gray-600 hover:bg-gray-700 p-2 rounded flex items-center">
-                    <span id="autoRefreshText">自动刷新</span>
-                    <span id="autoRefreshStatus" class="ml-1 text-xs bg-red-500 px-2 py-0.5 rounded">关闭</span>
-                </button>
-                <button onclick="window.location.href='/'" class="text-lg hover:bg-gray-700 p-2 rounded">返回控制台</button>
-                <button id="refreshBtn" onclick="refreshHistory()" class="text-lg bg-blue-600 hover:bg-blue-700 p-2 rounded flex items-center">
-                    <span>刷新</span>
-                    <svg class="w-4 h-4 ml-1 animate-spin hidden" id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+    <!-- 顶部导航栏 -->
+    <nav class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-700 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
+                            历史图片画廊
+                        </h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">浏览所有生成的图片</p>
+                    </div>
+                </div>
+
+                <!-- 右侧按钮组 -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- 主题切换按钮 -->
+                    <button onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 group" title="切换主题">
+                        <!-- 太阳图标（暗黑模式下显示） -->
+                        <svg class="w-5 h-5 text-amber-500 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        <!-- 月亮图标（白天模式下显示） -->
+                        <svg class="w-5 h-5 text-slate-600 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
+
+                    <!-- 自动刷新按钮 -->
+                    <button id="autoRefreshToggle" onclick="toggleAutoRefresh()" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 text-sm font-medium">
+                        <svg id="autoRefreshIcon" class="w-4 h-4 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span class="hidden sm:inline">自动刷新</span>
+                        <span id="autoRefreshStatus" class="text-xs px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400">关闭</span>
+                    </button>
+
+                    <!-- 刷新按钮 -->
+                    <button id="refreshBtn" onclick="refreshHistory()" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white transition-all duration-200 text-sm font-medium shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50">
+                        <svg id="refreshIcon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <svg id="refreshIconStatic" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span class="hidden sm:inline">刷新</span>
+                    </button>
+
+                    <!-- 返回控制台按钮 -->
+                    <button onclick="window.location.href='/'" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 text-sm font-medium">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        <span class="hidden sm:inline">控制台</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <!-- 画廊区域 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <div class="p-5 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>图片画廊</span>
+                    </h2>
+                    <span id="imageCount" class="text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">加载中...</span>
+                </div>
+                
+                <div id="historyGallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-fade-in">
+                    <!-- 图片将在这里渲染 -->
+                </div>
+                
+                <!-- 空状态 -->
+                <div id="emptyState" class="hidden text-center py-16">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                        <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-slate-400 dark:text-slate-500 text-sm">暂无历史图片</p>
+                    <p class="text-slate-400 dark:text-slate-500 text-xs mt-1">生成一些图片后，它们将显示在这里</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 全屏预览 -->
+    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+        <!-- 顶部操作栏 -->
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent">
+            <div class="flex items-center space-x-2">
+                <button onclick="closePreview()" class="flex items-center space-x-2 text-white/80 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
+                    <span>关闭</span>
+                </button>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openInNewTab()" class="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    <span class="hidden sm:inline">新标签页打开</span>
+                    <span class="sm:hidden">打开</span>
                 </button>
             </div>
         </div>
+        
+        <!-- 导航按钮 -->
+        <button id="prevBtn" onclick="prevImage()" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+        <button id="nextBtn" onclick="nextImage()" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+        
+        <!-- 图片 -->
+        <img id="previewImg" src="" class="max-h-[85vh] max-w-full rounded-lg shadow-2xl">
+    </div>
 
-        <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
-            <div id="historyGallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-fade-in"></div>
+    <!-- Toast通知 -->
+    <div id="toast" class="fixed top-5 right-5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 py-4 px-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 transform translate-x-full opacity-0 transition-all duration-300 z-50 flex items-center space-x-3">
+        <div id="toastIcon" class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
         </div>
-    </div>
-
-    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-2 md:p-4">
-        <button onclick="closePreview()" class="absolute top-3 right-3 md:top-4 md:right-6 text-3xl md:text-4xl">×</button>
-        
-        <!-- 上一张按钮 -->
-        <button id="prevBtn" onclick="prevImage()" class="absolute left-2 md:left-8 text-4xl md:text-6xl text-white bg-black/50 hover:bg-black/70 p-2 md:p-4 rounded-full transition-opacity opacity-70 hover:opacity-100">
-            &lt;
-        </button>
-        
-        <!-- 下一张按钮 -->
-        <button id="nextBtn" onclick="nextImage()" class="absolute right-2 md:right-8 text-4xl md:text-6xl text-white bg-black/50 hover:bg-black/70 p-2 md:p-4 rounded-full transition-opacity opacity-70 hover:opacity-100">
-            &gt;
-        </button>
-        
-        <img id="previewImg" src="" class="max-h-full max-w-full shadow-2xl">
-    </div>
-
-    <!-- Toast通知组件 -->
-    <div id="toast" class="fixed top-5 right-5 bg-gray-800 text-white py-3 px-5 rounded-lg shadow-lg transform translate-x-full opacity-0 transition-all duration-300 z-50">
-        <div id="toastMessage"></div>
+        <div id="toastMessage" class="font-medium text-sm"></div>
     </div>
 
     <script src="../js/common.js"></script>
     <script src="../js/gallery.js"></script>
+    <script>
+        // 主题切换功能
+        function toggleTheme() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        // 初始化主题
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+            } else {
+                // 检测系统偏好
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark');
+                }
+            }
+        }
+
+        // 页面加载时初始化主题
+        initTheme();
+    </script>
 </body>
 </html>

@@ -6,138 +6,377 @@
     <title>ZIT-Easy-Use</title>
     <link rel="icon" href="../resources/icon.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        .drawer { transition: transform 0.3s ease-in-out; }
-        .drawer-closed { transform: translateX(100%); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* 抽屉动画 */
+        .drawer {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .drawer-closed {
+            transform: translateX(100%);
+        }
+        
+        /* 玻璃拟态效果 */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.7);
+        }
+        
+        /* 输入框焦点效果 */
+        .input-focus {
+            transition: all 0.2s ease;
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        
+        /* 卡片悬停效果 */
+        .card-hover {
+            transition: all 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* 进度条动画 */
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        
+        /* 图片加载占位 */
+        .img-skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        .dark .img-skeleton {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-4 md:p-8">
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
 
-    <div class="max-w-4xl mx-auto space-y-6">
-        <div class="flex justify-between items-center border-b border-gray-700 pb-4">
-            <h1 class="text-2xl font-bold">ZIT 控制台</h1>
-            <div class="flex space-x-2">
-                <button onclick="window.location.href='/gallery'" class="text-lg hover:bg-gray-700 p-2 rounded">打开相册</button>
-                <button onclick="toggleDrawer()" class="text-lg hover:bg-gray-700 p-2 rounded">生成记录</button>
+    <!-- 顶部导航栏 -->
+    <nav class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-700 transition-colors duration-300">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
+                            ZIT 控制台
+                        </h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">AI 图像生成工作站</p>
+                    </div>
+                </div>
+
+                <!-- 右侧按钮组 -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- 主题切换按钮 -->
+                    <button onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 group" title="切换主题">
+                        <!-- 太阳图标（暗黑模式下显示） -->
+                        <svg class="w-5 h-5 text-amber-500 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        <!-- 月亮图标（白天模式下显示） -->
+                        <svg class="w-5 h-5 text-slate-600 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
+
+                    <button onclick="window.location.href='/gallery'" class="hidden sm:flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 text-sm font-medium">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                        <span>相册</span>
+                    </button>
+
+                    <button onclick="toggleDrawer()" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white transition-all duration-200 text-sm font-medium shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="hidden sm:inline">生成记录</span>
+                    </button>
+                </div>
             </div>
         </div>
+    </nav>
 
-        <div class="grid grid-cols-2 gap-6 bg-gray-800 p-6 rounded-xl shadow-lg">
-            <div class="col-span-2">
-                <div class="flex justify-between items-center mb-2">
-                    <label class="text-sm font-medium">提示词</label>
-                    <button id="promptToggleBtn" onclick="togglePromptHeight()" class="text-xs bg-gray-700 px-3 py-2 rounded hover:bg-gray-600 inline-flex whitespace-nowrap flex-shrink-0 w-fit">放大</button>
+    <!-- 主内容区 -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+        
+        <!-- 提示词区域 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden card-hover transition-colors duration-300">
+            <div class="p-5 sm:p-6">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        <span>提示词</span>
+                    </label>
+                    <button id="promptToggleBtn" onclick="togglePromptHeight()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center space-x-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                        </svg>
+                        <span>放大</span>
+                    </button>
                 </div>
-                <textarea id="promptText" rows="3" class="w-full bg-gray-700 rounded p-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                <textarea id="promptText" rows="3" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl p-4 outline-none input-focus text-sm resize-none placeholder-slate-400 transition-colors duration-300" placeholder="请输入图像生成提示词，描述你想要生成的画面..."></textarea>
             </div>
+        </section>
 
-            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
-                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
-                    <h3 class="font-medium">模型选择</h3>
-                    <button id="modelsToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleModelsContainer()">收起</button>
-                </div>
-                <div id="modelsContent" class="p-4 grid sm:grid-cols-2 gap-4" style="display: none;">
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">模型</label>
-                        <select id="modelSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
+        <!-- 模型选择 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <button onclick="toggleModelsContainer()" class="w-full px-5 sm:px-6 py-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
                     </div>
-
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">VAE</label>
-                        <select id="vaeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg"></select>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">模型选择</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="modelsToggleBtn" class="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">展开</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform" id="modelsArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: rotate(0deg)">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </button>
+            <div id="modelsContent" class="hidden px-5 sm:px-6 pb-5 sm:pb-6 grid sm:grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-700/50">
+                <div class="pt-4">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">主模型</label>
+                    <div class="relative">
+                        <select id="modelSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="pt-4">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">VAE</label>
+                    <div class="relative">
+                        <select id="vaeSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
-                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
-                    <h3 class="font-medium">生成参数</h3>
-                    <button id="paramsToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleParamsContainer()">展开</button>
+        <!-- 生成参数 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <button onclick="toggleParamsContainer()" class="w-full px-5 sm:px-6 py-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                        </svg>
+                    </div>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">生成参数</span>
                 </div>
-                <div id="paramsContent" class="p-4 grid sm:grid-cols-2 gap-4" style="display: none;">
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">采样器组合</label>
-                        <select id="samplerSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
-                            <!-- 选项将从index.js动态加载 -->
-                        </select>
+                <div class="flex items-center space-x-2">
+                    <span id="paramsToggleBtn" class="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">展开</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform" id="paramsArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: rotate(0deg)">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </button>
+            <div id="paramsContent" class="hidden px-5 sm:px-6 pb-5 sm:pb-6 grid sm:grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-700/50">
+                <div class="pt-4">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">采样器组合</label>
+                    <div class="relative">
+                        <select id="samplerSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </div>
-
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">CFG</label>
-                        <input type="number" id="cfgInput" value="1" min="0.1" max="20" step="0.1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
-                    </div>
-
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">图片比例</label>
-                        <select id="ratioSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg" onchange="updateSizeOptions()">
-                            <option value="1:1">1:1</option>
-                            <option value="3:4">3:4</option>
+                </div>
+                <div class="pt-4">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">CFG Scale</label>
+                    <input type="number" id="cfgInput" value="1" min="0.1" max="20" step="0.1" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                </div>
+                <div class="pt-2">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">图片比例</label>
+                    <div class="relative">
+                        <select id="ratioSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300" onchange="updateSizeOptions()">
+                            <option value="1:1">1:1 正方形</option>
+                            <option value="3:4">3:4 竖屏</option>
                             <option value="custom">自定义大小</option>
                         </select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </div>
-
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">图片尺寸</label>
-                        <select id="sizeSelect" class="w-full bg-gray-700 py-3 px-3 rounded-lg" onchange="updateResHint()">
-                        </select>
-                        <div id="customSizeInputs" class="hidden grid grid-cols-2 gap-2 mt-2">
-                            <input type="number" id="widthInput" placeholder="宽度" min="1" max="4096" class="bg-gray-700 py-3 px-3 rounded-lg">
-                            <input type="number" id="heightInput" placeholder="高度" min="1" max="4096" class="bg-gray-700 py-3 px-3 rounded-lg">
-                        </div>
+                </div>
+                <div class="pt-2">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">图片尺寸</label>
+                    <div class="relative">
+                        <select id="sizeSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300" onchange="updateResHint()"></select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </div>
-
-                    <div>
-                        <label class="block mb-2 text-sm font-medium">步数</label>
-                        <input type="number" id="stepsInput" value="9" min="8" max="20" step="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                    <div id="customSizeInputs" class="hidden grid grid-cols-2 gap-3 mt-3">
+                        <input type="number" id="widthInput" placeholder="宽度" min="1" max="4096" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                        <input type="number" id="heightInput" placeholder="高度" min="1" max="4096" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                    </div>
+                </div>
+                <div class="pt-2 sm:col-span-2">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-sm font-medium text-slate-600 dark:text-slate-400">采样步数</label>
+                        <span id="stepsValue" class="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 font-medium">9</span>
+                    </div>
+                    <input type="range" id="stepsInput" value="9" min="8" max="20" step="1" class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-600" oninput="document.getElementById('stepsValue').textContent = this.value">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>8</span>
+                        <span>14</span>
+                        <span>20</span>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <!-- LoRAs 设置 -->
-            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
-                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
-                    <div class="flex items-center">
-                        <input type="checkbox" id="loraEnable" class="w-5 h-5 mr-3">
-                        <h3 class="font-medium">LoRAs</h3>
+        <!-- LoRAs -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <div class="px-5 sm:px-6 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
                     </div>
-                    <button id="loraToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleLoraContainer()">展开</button>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">LoRAs</span>
                 </div>
-                <div id="loraContent" class="p-4" style="display: none;">
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block mb-2 text-sm font-medium">LoRA模型</label>
-                            <select id="loraModel" class="bg-gray-700 py-3 px-3 rounded-lg w-full">
-                                <!-- 选项将从config.json动态加载 -->
-                            </select>
+                <div class="flex items-center space-x-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="loraEnable" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-500"></div>
+                    </label>
+                    <button onclick="toggleLoraContainer()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" id="loraToggleBtn">展开</button>
+                </div>
+            </div>
+            <div id="loraContent" class="hidden px-5 sm:px-6 py-5">
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">LoRA 模型</label>
+                        <div class="relative">
+                            <select id="loraModel" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                            <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
                         </div>
-
-                        <div>
-                            <label class="block mb-2 text-sm font-medium">模型强度</label>
-                            <input type="number" id="loraStrength" value="0.8" step="0.05" min="0" max="2" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
-                        </div>
+                    </div>
+                    <div>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">模型强度</label>
+                        <input type="number" id="loraStrength" value="0.8" step="0.05" min="0" max="2" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
                     </div>
                 </div>
             </div>
+        </section>
 
-            <!-- 图片放大 -->
-            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
-
-                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
-                    <div class="flex items-center">
-                        <input type="checkbox" id="upscaleEnable" class="w-5 h-5 mr-3">
-                        <h3 class="font-medium">图片放大</h3>
+        <!-- 图片放大 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <div class="px-5 sm:px-6 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                        </svg>
                     </div>
-                    <button id="upscaleToggleBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleUpscaleContainer()">展开</button>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">图片放大</span>
                 </div>
-
-                <div id="upscaleContent" class="p-4" style="display: none;">
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block mb-2 text-sm font-medium">放大比例</label>
-                            <div class="flex items-center space-x-4">
-                                <select id="upscaleScale" class="bg-gray-700 py-3 px-3 rounded-lg flex-grow" onchange="updateResHint()">
+                <div class="flex items-center space-x-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="upscaleEnable" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                    <button onclick="toggleUpscaleContainer()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" id="upscaleToggleBtn">展开</button>
+                </div>
+            </div>
+            <div id="upscaleContent" class="hidden px-5 sm:px-6 py-5">
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">放大比例</label>
+                        <div class="flex items-center space-x-3">
+                            <div class="relative flex-1">
+                                <select id="upscaleScale" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300" onchange="updateResHint()">
                                     <option value="1.2">1.2x</option>
                                     <option value="1.25">1.25x</option>
                                     <option value="1.3">1.3x</option>
@@ -151,126 +390,245 @@
                                     <option value="1.7">1.7x</option>
                                     <option value="1.75">1.75x</option>
                                 </select>
-                                <span id="targetRes" class="text-xs text-gray-400 whitespace-nowrap">1356 x 1800</span>
+                                <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
                             </div>
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 text-sm font-medium">Denoise参数</label>
-                            <input type="number" id="denoiseValue" value="0.5" step="0.05" min="0" max="1" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
+                            <span id="targetRes" class="text-xs px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 whitespace-nowrap font-mono">1356 x 1800</span>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- 保存参数 -->
-            <div class="col-span-2 border border-gray-700 rounded-lg overflow-hidden">
-                <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
-                    <div class="flex items-center">
-                        <h3 class="font-medium">保存参数</h3>
-                    </div>
-                    <button id="saveParamsBtn" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600" onclick="toggleSaveParamsContainer()">展开</button>
-                </div>
-                <div id="saveParamsContent" class="p-4" style="display: none;">
-                    <div class="">
-                        <div>
-                            <label class="block mb-2 text-sm font-medium">文件前缀</label>
-                            <input type="text" id="filePrefix" value="zit-api" class="w-full bg-gray-700 py-3 px-3 rounded-lg">
-                        </div>
+                    <div>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">Denoise 强度</label>
+                        <input type="number" id="denoiseValue" value="0.5" step="0.05" min="0" max="1" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
                     </div>
                 </div>
             </div>
+        </section>
 
-
-            <!-- 任务进度展示 -->
-            <div id="progressContainer" class="col-span-2 hidden space-y-3 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                <div class="space-y-1">
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-blue-400 font-bold">初步采样 (Step 1/2)</span>
-                        <span id="progressText1">0%</span>
+        <!-- 保存参数 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <button onclick="toggleSaveParamsContainer()" class="w-full px-5 sm:px-6 py-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                        </svg>
                     </div>
-                    <div class="w-full bg-gray-700 rounded-full h-2">
-                        <div id="progress1" class="bg-blue-500 h-2 rounded-full transition-all duration-300 w-0"></div>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">保存参数</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="saveParamsBtn" class="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">展开</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform" id="saveParamsArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: rotate(0deg)">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </button>
+            <div id="saveParamsContent" class="hidden px-5 sm:px-6 pb-5 sm:pb-6 border-t border-slate-100 dark:border-slate-700/50">
+                <div class="pt-4">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">文件前缀</label>
+                    <div class="flex space-x-3">
+                        <input type="text" id="filePrefix" value="zit-api" class="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                        <button onclick="resetFilePrefix()" class="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-sm font-medium">重置</button>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2">支持使用 %date% 作为日期占位符</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 任务进度 -->
+        <section id="progressContainer" class="hidden bg-gradient-to-r from-primary-500/10 to-purple-500/10 dark:from-primary-900/30 dark:to-purple-900/30 rounded-2xl border border-primary-200 dark:border-primary-800 p-5 sm:p-6">
+            <div class="flex items-center space-x-2 mb-4">
+                <div class="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></div>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">生成进度</span>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-primary-700 dark:text-primary-400 font-medium">初步采样 (Step 1/2)</span>
+                        <span id="progressText1" class="text-slate-600 dark:text-slate-400 font-mono">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                        <div id="progress1" class="progress-bar bg-gradient-to-r from-primary-500 to-primary-600 h-2.5 rounded-full w-0"></div>
                     </div>
                 </div>
-                <div id="progressSection2" class="space-y-1 opacity-50">
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-purple-400 font-bold">二次采样 (Step 2/2)</span>
-                        <span id="progressText2">0%</span>
+                <div id="progressSection2" class="opacity-50">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-purple-700 dark:text-purple-400 font-medium">二次采样 (Step 2/2)</span>
+                        <span id="progressText2" class="text-slate-600 dark:text-slate-400 font-mono">0%</span>
                     </div>
-                    <div class="w-full bg-gray-700 rounded-full h-2">
-                        <div id="progress2" class="bg-purple-500 h-2 rounded-full transition-all duration-300 w-0"></div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                        <div id="progress2" class="progress-bar bg-gradient-to-r from-purple-500 to-purple-600 h-2.5 rounded-full w-0"></div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <button id="generateBtn" onclick="queuePrompt()" class="md:col-span-2 bg-blue-600 hover:bg-blue-700 py-3 px-4 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed">开始生成</button>
-                <select id="batchCount" class="md:col-span-1 bg-gray-700 py-3 px-3 rounded-lg min-w-[60px]">
-                    <option value="1">1</option><option value="2">2</option>
-                    <option value="4">4</option><option value="8">8</option>
-                    <option value="12">12</option><option value="16">16</option>
-                </select>
+        <!-- 操作按钮区 -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2 grid grid-cols-3 gap-3">
+                <button id="generateBtn" onclick="queuePrompt()" class="col-span-2 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-4 px-6 rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span>开始生成</span>
+                </button>
+                <div class="relative">
+                    <select id="batchCount" class="w-full h-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 pr-10 outline-none appearance-none text-center font-medium transition-colors duration-300 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <option value="1">1 张</option>
+                        <option value="2">2 张</option>
+                        <option value="4">4 张</option>
+                        <option value="8">8 张</option>
+                        <option value="12">12 张</option>
+                        <option value="16">16 张</option>
+                    </select>
+                    <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="interruptTask('current')" class="bg-yellow-600 hover:bg-yellow-700 py-3 rounded-lg text-sm">取消当前</button>
-                <button onclick="interruptTask('all')" class="bg-red-600 hover:bg-red-700 py-3 rounded-lg text-sm">清空队列</button>
+            <div class="grid grid-cols-1 gap-3">
+                <button onclick="interruptTask('current')" class="bg-amber-500 hover:bg-amber-600 text-white py-4 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center space-x-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="hidden sm:inline">取消当前</span>
+                    <span class="sm:hidden">取消</span>
+                </button>
             </div>
-        </div>
+        </section>
 
-        <div id="resultArea" class="mt-8 border-t border-gray-700 pt-6">
-            <h2 class="text-xl mb-4 text-gray-400">本次生成结果</h2>
-            <div id="imageContainer" class="grid grid-cols-2 gap-4"></div>
-        </div>
-    </div>
+        <!-- 生成结果 -->
+        <section id="resultArea" class="pt-4">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>本次生成结果</span>
+                </h2>
+                <span id="resultCount" class="text-xs px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hidden">0 张</span>
+            </div>
+            <div id="imageContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <!-- 图片将在这里渲染 -->
+            </div>
+            <div id="emptyState" class="text-center py-12">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                    <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <p class="text-slate-400 dark:text-slate-500 text-sm">点击"开始生成"按钮生成图片</p>
+            </div>
+        </section>
+    </main>
 
     <!-- 抽屉遮罩 -->
-    <div id="drawerOverlay" class="fixed inset-0 bg-black/50 z-30 hidden"></div>
+    <div id="drawerOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden transition-opacity opacity-0"></div>
     
-    <div id="drawer" class="drawer drawer-closed fixed top-0 right-0 h-full w-full max-w-[600px] bg-gray-800 shadow-2xl z-40 border-l border-gray-600 text-white">
+    <!-- 生成记录抽屉 -->
+    <div id="drawer" class="drawer drawer-closed fixed top-0 right-0 h-full w-full max-w-[600px] bg-white dark:bg-slate-800 shadow-2xl z-50 border-l border-slate-200 dark:border-slate-700 transition-colors duration-300">
         <!-- 固定的标题栏 -->
-        <div class="fixed top-0 right-0 w-full max-w-[600px] bg-gray-800 border-l border-gray-600 z-50 p-4">
+        <div class="fixed top-0 right-0 w-full max-w-[600px] bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-l border-slate-200 dark:border-slate-700 z-50 px-5 sm:px-6 py-4">
             <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">生成记录</h3>
-                <div class="flex space-x-2">
-                    <button onclick="clearHistory()" class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">清空记录</button>
-                    <button onclick="toggleDrawer()" class="text-2xl hover:bg-gray-700 p-1 rounded">×</button>
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200">生成记录</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">点击可查看详情</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="clearHistory()" class="flex items-center space-x-1 px-3 py-2 rounded-lg bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        <span class="hidden sm:inline">清空</span>
+                    </button>
+                    <button onclick="toggleDrawer()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                        <svg class="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
         <!-- 可滚动的内容区域 -->
-        <div class="pt-16 p-4 overflow-y-auto h-full">
-            <div id="historyList" class="grid grid-cols-2 gap-4"></div>
+        <div class="pt-28 sm:pt-28 p-5 sm:p-6 overflow-y-auto h-full">
+            <div id="historyList" class="grid grid-cols-2 gap-4">
+                <!-- 历史记录图片将在这里渲染 -->
+            </div>
+            <div id="historyEmptyState" class="text-center py-12">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <p class="text-slate-400 dark:text-slate-500 text-sm">暂无生成记录</p>
+            </div>
         </div>
     </div>
 
-    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-2 md:p-4">
-        <button onclick="sendToConsole()" class="absolute top-3 right-64 md:top-4 md:right-72 bg-green-600 text-white px-3 py-1 text-sm md:px-4 md:py-2 rounded">发送到控制台</button>
-        <button onclick="openInNewTab()" class="absolute top-3 right-24 md:top-4 md:right-36 bg-blue-600 text-white px-3 py-1 text-sm md:px-4 md:py-2 rounded">新标签页打开</button>
-        <button onclick="closePreview()" class="absolute top-3 right-3 md:top-4 md:right-6 text-3xl md:text-4xl">&times;</button>
+    <!-- 全屏预览 -->
+    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+        <!-- 顶部操作栏 -->
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent">
+            <div class="flex items-center space-x-2">
+                <button onclick="closePreview()" class="flex items-center space-x-2 text-white/80 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    <span>关闭</span>
+                </button>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="sendToConsole()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                    <span class="hidden sm:inline">发送到控制台</span>
+                    <span class="sm:hidden">发送</span>
+                </button>
+                <button onclick="openInNewTab()" class="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    <span class="hidden sm:inline">新标签页打开</span>
+                    <span class="sm:hidden">打开</span>
+                </button>
+            </div>
+        </div>
         
-        <!-- 上一张按钮 -->
-        <button id="prevBtn" onclick="prevImage()" class="absolute left-2 md:left-8 text-4xl md:text-6xl text-white bg-black/50 hover:bg-black/70 p-2 md:p-4 rounded-full transition-opacity opacity-70 hover:opacity-100">
-            &lt;
+        <!-- 导航按钮 -->
+        <button id="prevBtn" onclick="prevImage()" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+        <button id="nextBtn" onclick="nextImage()" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
         </button>
         
-        <!-- 下一张按钮 -->
-        <button id="nextBtn" onclick="nextImage()" class="absolute right-2 md:right-8 text-4xl md:text-6xl text-white bg-black/50 hover:bg-black/70 p-2 md:p-4 rounded-full transition-opacity opacity-70 hover:opacity-100">
-            &gt;
-        </button>
-        
-        <img id="previewImg" src="" class="max-h-full max-w-full shadow-2xl">
+        <!-- 图片 -->
+        <img id="previewImg" src="" class="max-h-[85vh] max-w-full rounded-lg shadow-2xl">
     </div>
 
-    <!-- Toast通知组件 -->
-    <div id="toast" class="fixed top-5 right-5 bg-gray-800 text-white py-3 px-5 rounded-lg shadow-lg transform translate-x-full opacity-0 transition-all duration-300 z-50">
-        <div id="toastMessage"></div>
+    <!-- Toast通知 -->
+    <div id="toast" class="fixed top-5 right-5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 py-4 px-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 transform translate-x-full opacity-0 transition-all duration-300 z-50 flex items-center space-x-3">
+        <div id="toastIcon" class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+        <div id="toastMessage" class="font-medium text-sm"></div>
     </div>
 
     <script src="../js/common.js"></script>
     <script src="../js/index.js"></script>
-
 </body>
 </html>

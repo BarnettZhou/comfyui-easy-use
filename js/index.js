@@ -11,17 +11,6 @@ let historyPollingTimer = null; // 历史记录轮询定时器
 let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
 let socket; // WebSocket 实例，用于监听进度更新
 
-// 采样器选项映射
-const samplerOptions = [
-    { value: 'er_sde,sgm_uniform', text: 'er_sde + sgm_uniform(黑兽)' },
-    { value: 'euler,sgm_uniform', text: 'euler + sgm_uniform(黑兽)' },
-    { value: 'er_sde,simple', text: 'er_sde + simple' },
-    { value: 'res_multistep,simple', text: 'res_multistep + simple' },
-    { value: 'euler,simple', text: 'euler + simple(BEYOND)' },
-    { value: 'dpmpp_2m,beta', text: 'dpmpp_2m + beta(unStable)' },
-    { value: 'dpmpp_2s_ancestral,FlowMatchEulerDiscreteScheduler', text: 'dpmpp_2s_ancestral + FlowMatchEulerDiscreteScheduler' }
-];
-
 // 页面卸载时停止轮询
 window.addEventListener('beforeunload', stopHistoryPolling);
 
@@ -29,7 +18,7 @@ window.addEventListener('beforeunload', stopHistoryPolling);
 async function initOriginalWorkflow() {
     try {
         // 加载原始工作流
-        const workflowResponse = await fetch('../original_workflow_lora.json');
+        const workflowResponse = await fetch('../original_workflow.json');
         originalWorkflow = await workflowResponse.json();
         console.log('原始工作流:', originalWorkflow);
     } catch (error) {
@@ -46,8 +35,13 @@ async function initConsole() {
         modelSelect.innerHTML = '';
         config.diffusion_models.forEach(model => {
             const option = document.createElement('option');
-            option.value = model;
-            option.textContent = model;
+            if (typeof model === 'string') {
+                option.value = model;
+                option.textContent = model;
+            } else {
+                option.value = model.value;
+                option.textContent = model.text;
+            }
             modelSelect.appendChild(option);
         });
 
@@ -56,8 +50,13 @@ async function initConsole() {
         vaeSelect.innerHTML = '';
         config.vae_models.forEach(vae => {
             const option = document.createElement('option');
-            option.value = vae;
-            option.textContent = vae;
+            if (typeof vae === 'string') {
+                option.value = vae;
+                option.textContent = vae;
+            } else {
+                option.value = vae.value;
+                option.textContent = vae.text;
+            }
             vaeSelect.appendChild(option);
         });
 
@@ -103,8 +102,6 @@ function setupWebSocket() {
     socket = new WebSocket(wsUrl);
 
     socket.onmessage = (event) => {
-        console.log('收到消息:', event.data);
-
         if (typeof event.data === 'string') {
             const msg = JSON.parse(event.data);
 
@@ -155,9 +152,48 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initServerConfig();
     initOriginalWorkflow();
     initConsole();
+    initTheme();
 });
 
-// 分辨率提示更新
+// ========== 主题切换功能 ==========
+function toggleTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.classList.contains('dark') ? 'dark' : 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    if (newTheme === 'dark') {
+        html.classList.add('dark');
+    } else {
+        html.classList.remove('dark');
+    }
+    
+    localStorage.setItem('theme', newTheme);
+}
+
+// 初始化主题
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+    
+    // 监听系统主题变化
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('theme')) {
+            if (e.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+    });
+}
+
+// ========== 分辨率提示更新 ==========
 function updateResHint() {
     const ratio = document.getElementById('ratioSelect').value;
     const scale = parseFloat(document.getElementById('upscaleScale').value);
@@ -222,7 +258,7 @@ function updateSizeOptions() {
     updateResHint();
 }
 
-// 主生成逻辑
+// ========== 主生成逻辑 ==========
 async function queuePrompt() {
     if (isGenerating) return; 
 
@@ -288,11 +324,6 @@ async function queuePrompt() {
         // 模型和VAE参数
         p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
         p["32"].inputs.vae_name = document.getElementById('vaeSelect').value;
-
-        // // 保存参数
-        // const date_str = new Date().toISOString().split('T')[0];
-        // p["42"].inputs.filename_prefix = `zit-api/${date_str}/${prefix}`;
-        // p["9"].inputs.filename_prefix = `zit-api/${date_str}/${prefix}`;
 
         // 放大处理
         if(!document.getElementById('upscaleEnable').checked) {
@@ -377,123 +408,181 @@ function trackTask(id) {
     });
 }
 
-// 渲染图片
+// ========== 渲染图片 ==========
 function renderImg(outputs) {
     const container = document.getElementById('imageContainer');
+    const emptyState = document.getElementById('emptyState');
+    const resultCount = document.getElementById('resultCount');
+    
+    if (emptyState) {
+        emptyState.style.display = 'none';
+    }
+    if (resultCount) {
+        resultCount.classList.remove('hidden');
+    }
     
     if (clearOnNextRender) {
-        container.innerHTML = ""; 
-        clearOnNextRender = false; 
+        container.innerHTML = '';
+        clearOnNextRender = false;
     }
 
     const nodeIds = Object.keys(outputs).sort().reverse();
+    let imageCount = container.children.length;
 
-    for(let nodeId of nodeIds) {
+    for (let nodeId of nodeIds) {
         outputs[nodeId].images.forEach(img => {
             const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
             
             const wrapper = document.createElement('div');
-            wrapper.className = "relative group animate-fade-in"; 
+            wrapper.className = 'relative group animate-fade-in';
             wrapper.innerHTML = `
-                <img src="${url}" loading="lazy" onclick="openResultPreview('${url}')" 
-                        class="w-full h-auto rounded-lg shadow-lg cursor-pointer hover:opacity-90 transition border border-gray-700">
-                <span class="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                <div class="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 img-skeleton">
+                    <img src="${url}" loading="lazy" onclick="openResultPreview('${url}')" 
+                        class="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                        onload="this.parentElement.classList.remove('img-skeleton')">
+                </div>
+                <span class="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm">
                     ${nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图'}
                 </span>
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl"></div>
             `;
-            container.prepend(wrapper); 
+            container.prepend(wrapper);
+            imageCount++;
         });
+    }
+    
+    if (resultCount) {
+        resultCount.textContent = imageCount + ' 张';
     }
 }
 
-// 历史记录
+// ========== 历史记录 ==========
 async function loadHistory() {
     const res = await fetch(`${SERVER}/history`);
     const data = await res.json();
     const list = document.getElementById('historyList');
-    const newEntries = []; // 存储新的历史记录项
-    const newHistoryImages = []; // 存储新的历史图片URL
-    const newHistoryImageData = []; // 存储新的历史图片数据
+    const emptyState = document.getElementById('historyEmptyState');
+    const newEntries = [];
+    const newHistoryImages = [];
+    const newHistoryImageData = [];
 
-    // 遍历历史记录（倒序，最新的在前面）
     Object.entries(data).reverse().forEach(([taskId, item]) => {
-        if(!item.outputs) return;
-        for(let nid in item.outputs) {
+        if (!item.outputs) return;
+        for (let nid in item.outputs) {
             item.outputs[nid].images?.forEach(img => {
-                // 【修复点】同样增加 encodeURIComponent
                 const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
-
-                // 生成唯一标识，防止重复加载相同图片（包含taskId、节点ID和文件名）
                 const imageKey = `${taskId}-${nid}-${img.filename}`;
                 
-                // 检查图片是否已经显示，如果没有则添加
                 if (!displayedTaskIds.has(imageKey)) {
-                    // 标记图片为已显示
                     displayedTaskIds.add(imageKey);
                     
-                    // 创建图片容器
+                    // 获取图片信息
+                    const prompt = item.prompt[2] || {};
+                    const width = prompt['5']?.inputs?.width || '-';
+                    const height = prompt['5']?.inputs?.height || '-';
+                    const model = prompt['34']?.inputs?.unet_name || '-';
+                    const samplerName = prompt['3']?.inputs?.sampler_name || '-';
+                    const scheduler = prompt['3']?.inputs?.scheduler || '-';
+                    const promptText = prompt['6']?.inputs?.text || '';
+                    
+                    // 创建外层容器
+                    const container = document.createElement('div');
+                    container.className = 'flex flex-col gap-2';
+                    
+                    // 图片包装器
                     const imgWrapper = document.createElement('div');
-                    imgWrapper.className = "relative w-full mb-2";
+                    imgWrapper.className = 'relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 group cursor-pointer';
                     
-                    // 创建新的图片元素
-                    const i = document.createElement('img');
-                    i.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; // 空白占位图
-                    i.setAttribute('data-src', url); // 存储真实图片URL
-                    i.loading = 'lazy';
-                    i.className = "w-full rounded cursor-pointer border border-gray-600 hover:border-blue-500";
-                    i.onclick = () => openPreview(url, taskId);
-
-                    // 当图片进入视口时加载真实图片，离开视口时回收资源
-                    const observer = new IntersectionObserver((entries) => {
-                        entries.forEach(entry => {
-                            const img = entry.target;
-                            if (entry.isIntersecting) {
-                                // 图片进入视口，加载真实图片
-                                img.src = img.getAttribute('data-src');
-                            } else {
-                                // 图片离开视口，回收资源
-                                img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-                            }
-                        });
-                    }, {
-                        // 当图片50%进入视口时触发加载
-                        threshold: 0.1
-                    });
-
-                    observer.observe(i);
-                    
-                    // 添加类型标签
                     const isLargeImage = nid === '39' || nid === '42';
-                    const labelText = isLargeImage ? '高清大图' : '预览草图';
-                    const labelColor = isLargeImage ? 'bg-purple-600' : 'bg-blue-600';
+                    const labelColor = isLargeImage ? 'bg-purple-500' : 'bg-primary-500';
+                    
+                    const imgEl = document.createElement('img');
+                    imgEl.src = url;
+                    imgEl.loading = 'lazy';
+                    imgEl.className = 'w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer';
+                    imgEl.onclick = (e) => {
+                        e.stopPropagation();
+                        openPreview(url, taskId);
+                    };
+                    imgWrapper.appendChild(imgEl);
                     
                     const label = document.createElement('span');
-                    label.className = `absolute top-2 right-2 ${labelColor} text-white text-xs px-2 py-1 rounded backdrop-blur-sm z-10`;
-                    label.textContent = labelText;
-                    
-                    // 将图片和标签添加到容器
-                    imgWrapper.appendChild(i);
+                    label.className = `absolute top-2 right-2 ${labelColor} text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm pointer-events-none`;
+                    label.style.pointerEvents = 'none';
+                    label.textContent = isLargeImage ? '高清' : '预览';
                     imgWrapper.appendChild(label);
                     
-                    // 将新元素和数据存储起来
-                    newEntries.unshift(imgWrapper); // 保持最新的在前面
-                    newHistoryImages.unshift(url); // 保持最新的在前面
-                    newHistoryImageData.unshift({ url, taskId }); // 保持最新的在前面
+                    const overlay = document.createElement('div');
+                    overlay.className = 'absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none';
+                    overlay.style.pointerEvents = 'none';
+                    imgWrapper.appendChild(overlay);
+                    
+                    // 同时为imgWrapper添加点击事件
+                    imgWrapper.onclick = (e) => {
+                        e.stopPropagation();
+                        openPreview(url, taskId);
+                    };
+                    
+                    // 也为img元素添加阻止冒泡的处理
+                    imgEl.onclick = (e) => {
+                        e.stopPropagation();
+                        openPreview(url, taskId);
+                    };
+                    
+                    container.appendChild(imgWrapper);
+                    
+                    // 信息展示区域
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'px-1 space-y-2 text-xs';
+                    
+                    // 提示词放第一行（限制2行）
+                    if (promptText) {
+                        const promptDiv = document.createElement('div');
+                        promptDiv.className = 'text-slate-700 dark:text-slate-300 font-medium line-clamp-2 break-words leading-relaxed';
+                        promptDiv.style.display = '-webkit-box';
+                        promptDiv.style.webkitLineClamp = '2';
+                        promptDiv.style.webkitBoxOrient = 'vertical';
+                        promptDiv.style.overflow = 'hidden';
+                        promptDiv.textContent = promptText;
+                        infoDiv.appendChild(promptDiv);
+                    }
+                    
+                    // 模型名称单独一行
+                    const modelLine = document.createElement('div');
+                    modelLine.className = 'text-slate-500 dark:text-slate-400 truncate';
+                    modelLine.textContent = model;
+                    infoDiv.appendChild(modelLine);
+                    
+                    // 尺寸、采样器、调度器使用标签形式一行展示
+                    const tagsLine = document.createElement('div');
+                    tagsLine.className = 'flex flex-wrap gap-1.5';
+                    tagsLine.innerHTML = `
+                        <span class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-medium">${width}×${height}</span>
+                        <span class="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-medium">${samplerName}</span>
+                        <span class="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium">${scheduler}</span>
+                    `;
+                    infoDiv.appendChild(tagsLine);
+                    
+                    container.appendChild(infoDiv);
+                    
+                    newEntries.unshift(container);
+                    newHistoryImages.unshift(url);
+                    newHistoryImageData.unshift({ url, taskId });
                 }
             });
         }
     });
 
-    // 如果有新的记录，添加到列表顶部
     if (newEntries.length > 0) {
-        // 将新记录添加到列表开头
         newEntries.forEach(entry => {
             list.insertBefore(entry, list.firstChild);
         });
-
-        // 更新历史数组（保持最新的在前面）
         historyImages = [...historyImages, ...newHistoryImages];
         historyImageData = [...historyImageData, ...newHistoryImageData];
+        
+        if (emptyState) {
+            emptyState.style.display = 'none';
+        }
     }
 }
 
@@ -507,49 +596,87 @@ async function interruptTask(type) {
     }
 }
 
+// ========== 预览功能 ==========
 function openPreview(url, taskId) {
-    document.getElementById('previewImg').src = url;
-    document.getElementById('fullPreview').classList.remove('hidden');
+
+    const preview = document.getElementById('fullPreview');
+    const previewImg = document.getElementById('previewImg');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    previewImg.src = url;
+    preview.classList.remove('hidden');
 
     // 查找当前图片在历史数组中的索引
     currentPreviewIndex = historyImages.indexOf(url);
     currentTaskId = taskId;
 
     // 显示导航按钮
-    document.getElementById('prevBtn').classList.remove('hidden');
-    document.getElementById('nextBtn').classList.remove('hidden');
+    if (prevBtn) prevBtn.classList.remove('hidden');
+    if (nextBtn) nextBtn.classList.remove('hidden');
 }
 
 function closePreview() {
     document.getElementById('fullPreview').classList.add('hidden');
 }
 
+// 预览生成结果图片（独立预览，不参与历史导航）
+function openResultPreview(url) {
+    const preview = document.getElementById('fullPreview');
+    const previewImg = document.getElementById('previewImg');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    // 显示预览但不设置当前索引，这样导航按钮将不会工作
+    previewImg.src = url;
+    preview.classList.remove('hidden');
+
+    // 临时将历史导航功能禁用
+    currentPreviewIndex = -1;
+    currentTaskId = null; // 从当前结果打开的图片没有历史任务ID
+
+    // 隐藏导航按钮
+    if (prevBtn) prevBtn.classList.add('hidden');
+    if (nextBtn) nextBtn.classList.add('hidden');
+}
+
 function toggleDrawer() { 
     const drawer = document.getElementById('drawer');
     const overlay = document.getElementById('drawerOverlay');
 
+    // 使用 toggle 切换 drawer-closed 类
     drawer.classList.toggle('drawer-closed');
-    overlay.classList.toggle('hidden');
 
-    if(!drawer.classList.contains('drawer-closed')) {
-        // 抽屉打开时，清空已显示图片键集合和历史数组
+    if (!drawer.classList.contains('drawer-closed')) {
+        // 抽屉打开
+        overlay.classList.remove('hidden');
+        // 强制重绘以确保过渡动画生效
+        void overlay.offsetWidth;
+        overlay.classList.remove('opacity-0');
+        
+        // 加载历史记录
         displayedTaskIds.clear();
         historyImages = [];
         historyImageData = [];
-        // 清空历史记录列表
-        document.getElementById('historyList').innerHTML = "";
-        // 重新加载所有历史记录
+        document.getElementById('historyList').innerHTML = '';
+        const emptyState = document.getElementById('historyEmptyState');
+        if (emptyState) emptyState.style.display = 'block';
         loadHistory();
-        // 启动轮询
         startHistoryPolling();
     } else {
-        // 抽屉关闭时，停止轮询
+        // 抽屉关闭
+        overlay.classList.add('opacity-0');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+        }, 300);
         stopHistoryPolling();
     }
 }
 
 // 点击遮罩关闭抽屉
-document.getElementById('drawerOverlay').addEventListener('click', toggleDrawer);
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('drawerOverlay').addEventListener('click', toggleDrawer);
+});
 
 // 请求 Comfyui 服务，清空历史记录
 async function clearHistory() {
@@ -565,7 +692,9 @@ async function clearHistory() {
             displayedTaskIds.clear();
             historyImages = [];
             historyImageData = [];
-            document.getElementById('historyList').innerHTML = "";
+            document.getElementById('historyList').innerHTML = '';
+            const emptyState = document.getElementById('historyEmptyState');
+            if (emptyState) emptyState.style.display = 'block';
             
             // 重新加载历史记录（应该为空）
             loadHistory();
@@ -614,8 +743,6 @@ async function sendToConsole() {
         const data = await res.json();
         const task = data[currentTaskId];
 
-        console.log(task);
-
         if (!task || !task.prompt) {
             showToast('无法获取任务参数');
             return;
@@ -631,11 +758,20 @@ async function sendToConsole() {
 
         // 模型和VAE
         if (promptData["34"] && promptData["34"].inputs.unet_name) {
-            document.getElementById('modelSelect').value = promptData["34"].inputs.unet_name;
+            const unetName = promptData["34"].inputs.unet_name;
+            // 查找模型名称对应的显示文本
+            const modelOption = config.diffusion_models.find(opt => opt.value === unetName);
+            if (modelOption) {
+                document.getElementById('modelSelect').value = modelOption.value;
+            }
         }
 
         if (promptData["32"] && promptData["32"].inputs.vae_name) {
-            document.getElementById('vaeSelect').value = promptData["32"].inputs.vae_name;
+            // 查找VAE名称对应的显示文本
+            const vaeOption = config.vae_models.find(opt => opt.value === promptData["32"].inputs.vae_name);
+            if (vaeOption) {
+                document.getElementById('vaeSelect').value = vaeOption.value;
+            }
         }
 
         // CFG
@@ -773,6 +909,7 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// ========== 面板控制 ==========
 // 控制提示词输入框高度
 function togglePromptHeight() {
     const textarea = document.getElementById('promptText');
@@ -783,26 +920,39 @@ function togglePromptHeight() {
         // 折叠状态
         textarea.style.height = '';
         textarea.setAttribute('rows', '3');
-        toggleBtn.textContent = '放大';
+        toggleBtn.innerHTML = `
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+            </svg>
+            <span>放大</span>
+        `;
     } else {
         // 展开状态
         textarea.style.height = '400px';
-        toggleBtn.textContent = '缩小';
+        toggleBtn.innerHTML = `
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+            </svg>
+            <span>缩小</span>
+        `;
     }
 }
 
 function toggleModelsContainer() {
     const content = document.getElementById('modelsContent');
     const toggleBtn = document.getElementById('modelsToggleBtn');
-    // 检查当前是否处于展开状态
-    if (content.style.display === 'none') {
-        // 展开状态
-        content.style.display = 'grid';
+    const arrow = document.getElementById('modelsArrow');
+    
+    const isHidden = content.classList.contains('hidden');
+    
+    if (isHidden) {
+        content.classList.remove('hidden');
         toggleBtn.textContent = '收起';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
     } else {
-        // 折叠状态
-        content.style.display = 'none';
+        content.classList.add('hidden');
         toggleBtn.textContent = '展开';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -810,16 +960,18 @@ function toggleModelsContainer() {
 function toggleParamsContainer() {
     const content = document.getElementById('paramsContent');
     const toggleBtn = document.getElementById('paramsToggleBtn');
+    const arrow = document.getElementById('paramsArrow');
 
-    // 检查当前是否处于展开状态
-    if (content.style.display === 'none') {
-        // 展开状态
-        content.style.display = 'grid';
+    const isHidden = content.classList.contains('hidden');
+    
+    if (isHidden) {
+        content.classList.remove('hidden');
         toggleBtn.textContent = '收起';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
     } else {
-        // 折叠状态
-        content.style.display = 'none';
+        content.classList.add('hidden');
         toggleBtn.textContent = '展开';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -828,14 +980,13 @@ function toggleUpscaleContainer() {
     const content = document.getElementById('upscaleContent');
     const toggleBtn = document.getElementById('upscaleToggleBtn');
 
-    // 检查当前是否处于展开状态
-    if (content.style.display === 'none') {
-        // 展开状态
-        content.style.display = 'block';
+    const isHidden = content.classList.contains('hidden');
+    
+    if (isHidden) {
+        content.classList.remove('hidden');
         toggleBtn.textContent = '收起';
     } else {
-        // 折叠状态
-        content.style.display = 'none';
+        content.classList.add('hidden');
         toggleBtn.textContent = '展开';
     }
 }
@@ -844,15 +995,18 @@ function toggleUpscaleContainer() {
 function toggleSaveParamsContainer() {
     const content = document.getElementById('saveParamsContent');
     const toggleBtn = document.getElementById('saveParamsBtn');
-    // 检查当前是否处于展开状态
-    if (content.style.display === 'none') {
-        // 展开状态
-        content.style.display = 'block';
+    const arrow = document.getElementById('saveParamsArrow');
+    
+    const isHidden = content.classList.contains('hidden');
+    
+    if (isHidden) {
+        content.classList.remove('hidden');
         toggleBtn.textContent = '收起';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
     } else {
-        // 折叠状态
-        content.style.display = 'none';
+        content.classList.add('hidden');
         toggleBtn.textContent = '展开';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -861,19 +1015,28 @@ function toggleLoraContainer() {
     const content = document.getElementById('loraContent');
     const toggleBtn = document.getElementById('loraToggleBtn');
 
-    // 检查当前是否处于展开状态
-    if (content.style.display === 'none') {
-        // 展开状态
-        content.style.display = 'block';
+    const isHidden = content.classList.contains('hidden');
+    
+    if (isHidden) {
+        content.classList.remove('hidden');
         toggleBtn.textContent = '收起';
     } else {
-        // 折叠状态
-        content.style.display = 'none';
+        content.classList.add('hidden');
         toggleBtn.textContent = '展开';
     }
 }
 
-// Toast通知函数
+// 重置文件前缀为配置中的默认值
+function resetFilePrefix() {
+    if (config && config.prefix) {
+        document.getElementById('filePrefix').value = config.prefix;
+        showToast('文件前缀已重置为默认值');
+    } else {
+        showToast('无法获取默认文件前缀');
+    }
+}
+
+// ========== Toast通知 ==========
 function showToast(message, duration = 3000) {
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
@@ -890,24 +1053,6 @@ function showToast(message, duration = 3000) {
         toast.classList.remove('translate-x-0', 'opacity-100');
         toast.classList.add('translate-x-full', 'opacity-0');
     }, duration);
-}
-
-// 预览生成结果图片（独立预览，不参与历史导航）
-function openResultPreview(url) {
-    const preview = document.getElementById('fullPreview');
-    const previewImg = document.getElementById('previewImg');
-
-    // 显示预览但不设置当前索引，这样导航按钮将不会工作
-    previewImg.src = url;
-    preview.classList.remove('hidden');
-
-    // 临时将历史导航功能禁用
-    currentPreviewIndex = -1;
-    currentTaskId = null; // 从当前结果打开的图片没有历史任务ID
-
-    // 隐藏导航按钮
-    document.getElementById('prevBtn').classList.add('hidden');
-    document.getElementById('nextBtn').classList.add('hidden');
 }
 
 // 点击预览遮罩关闭预览
