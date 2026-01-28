@@ -32,6 +32,21 @@ function getLocalIP() {
 const PORT = 11451;
 const HOST = '0.0.0.0'; // 允许所有设备访问
 
+// 检查config.json文件是否存在
+const configPath = path.join(__dirname, 'config.json');
+// const exampleConfigPath = path.join(__dirname, 'example-config.json');
+
+if (!fs.existsSync(configPath)) {
+    console.log('\n错误：未找到config.json配置文件！');
+    console.log('\n请按照以下步骤配置：');
+    console.log('1. 复制 example-config.json 文件');
+    console.log('2. 将其重命名为 config.json');
+    console.log('3. 根据实际情况修改配置内容');
+    console.log('4. 重新启动本服务\n');
+    console.log('提示：example-config.json 文件应位于当前目录下\n');
+    process.exit(1);
+}
+
 // 支持的MIME类型
 const mimeTypes = {
     '.html': 'text/html',
