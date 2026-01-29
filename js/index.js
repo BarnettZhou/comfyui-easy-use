@@ -619,8 +619,11 @@ function openPreview(url, taskId) {
 
 function closePreview() {
     document.getElementById('fullPreview').classList.add('hidden');
-    // 恢复body滚动
-    document.body.style.overflow = '';
+    // 只有当抽屉也关闭时才恢复body滚动
+    const drawer = document.getElementById('drawer');
+    if (drawer && drawer.classList.contains('drawer-closed')) {
+        document.body.style.overflow = '';
+    }
 }
 
 // 预览生成结果图片（独立预览，不参与历史导航）
