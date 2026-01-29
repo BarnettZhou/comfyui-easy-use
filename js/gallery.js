@@ -31,8 +31,10 @@ async function loadHistory() {
     const res = await fetch(`${SERVER}/history`);
     const data = await res.json();
     const gallery = document.getElementById('historyGallery');
-    const newHistoryImages = []; // 存储新的历史图片URL
-    const newHistoryImageData = []; // 存储新的历史图片数据
+    const emptyState = document.getElementById('emptyState');
+    const newEntries = []; // 存储新发现的图片条目
+    const newHistoryImages = []; // 存储新图片URL
+    const newHistoryImageData = []; // 存储新图片数据
 
     // 遍历历史记录（倒序，最新的在前面）
     Object.entries(data).reverse().forEach(([taskId, item]) => {
@@ -49,16 +51,15 @@ async function loadHistory() {
         
         for(let nid in item.outputs) {
             item.outputs[nid].images?.forEach(img => {
-                // 【修复点】同样增加 encodeURIComponent
-                const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
-
                 // 生成唯一标识，防止重复加载相同图片（包含taskId、节点ID和文件名）
                 const imageKey = `${taskId}-${nid}-${img.filename}`;
                 
-                // 检查图片是否已经显示，如果没有则添加
+                // 检查图片是否已经显示，如果没有则处理
                 if (!displayedTaskIds.has(imageKey)) {
                     // 标记图片为已显示
                     displayedTaskIds.add(imageKey);
+                    
+                    const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
                     
                     // 创建外层容器 - 包含图片和信息
                     const container = document.createElement('div');
@@ -81,21 +82,18 @@ async function loadHistory() {
                         entries.forEach(entry => {
                             const img = entry.target;
                             if (entry.isIntersecting) {
-                                // 图片进入视口，加载真实图片
                                 img.src = img.getAttribute('data-src');
                             } else {
-                                // 图片离开视口，回收资源
                                 img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
                             }
                         });
                     }, {
-                        // 当图片50%进入视口时触发加载
                         threshold: 0.1
                     });
 
                     observer.observe(i);
                     
-                    // 添加类型标签 - 使用新的样式
+                    // 添加类型标签
                     const isLargeImage = nid === '39' || nid === '42';
                     const labelText = isLargeImage ? '高清大图' : '预览草图';
                     const labelColor = isLargeImage 
@@ -110,22 +108,17 @@ async function loadHistory() {
                     const overlay = document.createElement('div');
                     overlay.className = 'absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none';
                     
-                    // 将元素添加到图片包装器
                     imgWrapper.appendChild(i);
                     imgWrapper.appendChild(label);
                     imgWrapper.appendChild(overlay);
-                    
-                    // 添加图片点击事件
                     imgWrapper.onclick = () => openPreview(url, taskId);
                     
-                    // 将图片包装器添加到容器
                     container.appendChild(imgWrapper);
                     
                     // 创建信息展示区域
                     const infoDiv = document.createElement('div');
                     infoDiv.className = 'px-1 space-y-2 text-xs';
                     
-                    // 提示词放第一行（限制2行）
                     if (promptText) {
                         const promptDiv = document.createElement('div');
                         promptDiv.className = 'text-slate-700 dark:text-slate-300 font-medium line-clamp-2 break-words leading-relaxed';
@@ -137,13 +130,11 @@ async function loadHistory() {
                         infoDiv.appendChild(promptDiv);
                     }
                     
-                    // 模型名称单独一行
                     const modelLine = document.createElement('div');
                     modelLine.className = 'text-slate-500 dark:text-slate-400 truncate';
                     modelLine.textContent = model;
                     infoDiv.appendChild(modelLine);
                     
-                    // 尺寸、采样器、调度器使用标签形式一行展示
                     const tagsLine = document.createElement('div');
                     tagsLine.className = 'flex flex-wrap gap-1.5';
                     tagsLine.innerHTML = `
@@ -153,23 +144,34 @@ async function loadHistory() {
                     `;
                     infoDiv.appendChild(tagsLine);
                     
-                    // 将信息区域添加到容器
                     container.appendChild(infoDiv);
                     
-                    // 将容器添加到画廊
-                    gallery.appendChild(container);
-                    
-                    // 将新图片数据存储起来
-                    newHistoryImages.unshift(url); // 保持最新的在前面
-                    newHistoryImageData.unshift({ url, taskId }); // 保持最新的在前面
+                    // 收集新条目（保持最新的在前面）
+                    newEntries.unshift(container);
+                    newHistoryImages.unshift(url);
+                    newHistoryImageData.unshift({ url, taskId });
                 }
             });
         }
     });
 
-    // 更新历史数组（保持最新的在前面）
-    historyImages = [...newHistoryImages, ...historyImages];
-    historyImageData = [...newHistoryImageData, ...historyImageData];
+    // 只有发现新图片时才更新DOM和数组
+    if (newEntries.length > 0) {
+        // 将新条目添加到画廊开头（insertBefore firstChild）
+        newEntries.forEach(entry => {
+            gallery.insertBefore(entry, gallery.firstChild);
+        });
+        
+        // 更新历史数组（新图片追加到末尾，保持与index.js一致）
+        historyImages = [...historyImages, ...newHistoryImages];
+        historyImageData = [...historyImageData, ...newHistoryImageData];
+        
+        // 隐藏空状态并显示画廊
+        gallery.classList.remove('hidden');
+        if (emptyState) {
+            emptyState.classList.add('hidden');
+        }
+    }
     
     // 更新图片计数
     updateImageCount();
