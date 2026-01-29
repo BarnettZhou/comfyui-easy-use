@@ -238,6 +238,8 @@ function openPreview(url, taskId) {
     
     if (previewImg) previewImg.src = url;
     if (fullPreview) fullPreview.classList.remove('hidden');
+    // 禁用body滚动
+    document.body.style.overflow = 'hidden';
 
     // 查找当前图片在历史数组中的索引
     currentPreviewIndex = historyImages.indexOf(url);
@@ -254,6 +256,8 @@ function openPreview(url, taskId) {
 function closePreview() {
     const fullPreview = document.getElementById('fullPreview');
     if (fullPreview) fullPreview.classList.add('hidden');
+    // 恢复body滚动
+    document.body.style.overflow = '';
 }
 
 // 在新标签页打开图片

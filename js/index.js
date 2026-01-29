@@ -598,7 +598,6 @@ async function interruptTask(type) {
 
 // ========== 预览功能 ==========
 function openPreview(url, taskId) {
-
     const preview = document.getElementById('fullPreview');
     const previewImg = document.getElementById('previewImg');
     const prevBtn = document.getElementById('prevBtn');
@@ -606,6 +605,8 @@ function openPreview(url, taskId) {
     
     previewImg.src = url;
     preview.classList.remove('hidden');
+    // 禁用body滚动
+    document.body.style.overflow = 'hidden';
 
     // 查找当前图片在历史数组中的索引
     currentPreviewIndex = historyImages.indexOf(url);
@@ -618,6 +619,8 @@ function openPreview(url, taskId) {
 
 function closePreview() {
     document.getElementById('fullPreview').classList.add('hidden');
+    // 恢复body滚动
+    document.body.style.overflow = '';
 }
 
 // 预览生成结果图片（独立预览，不参与历史导航）
@@ -630,6 +633,8 @@ function openResultPreview(url) {
     // 显示预览但不设置当前索引，这样导航按钮将不会工作
     previewImg.src = url;
     preview.classList.remove('hidden');
+    // 禁用body滚动
+    document.body.style.overflow = 'hidden';
 
     // 临时将历史导航功能禁用
     currentPreviewIndex = -1;
@@ -653,6 +658,8 @@ function toggleDrawer() {
         // 强制重绘以确保过渡动画生效
         void overlay.offsetWidth;
         overlay.classList.remove('opacity-0');
+        // 禁用body滚动
+        document.body.style.overflow = 'hidden';
         
         // 加载历史记录
         displayedTaskIds.clear();
@@ -669,6 +676,8 @@ function toggleDrawer() {
         setTimeout(() => {
             overlay.classList.add('hidden');
         }, 300);
+        // 恢复body滚动
+        document.body.style.overflow = '';
         stopHistoryPolling();
     }
 }
