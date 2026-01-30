@@ -1,0 +1,25 @@
+{
+  "name": "ZIT Easy Use",
+  "short_name": "ZIT",
+  "description": "AI 图像生成工作站",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/resources/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/resources/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": ["productivity", "utilities", "graphics", "design"]
+}
