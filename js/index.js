@@ -865,7 +865,6 @@ async function sendToConsole() {
         }
 
         // 文件名前缀
-        let prefix = '';
         if (promptData["9"] && promptData["9"].inputs.filename_prefix) {
             let prefix_parts = promptData["9"].inputs.filename_prefix.split('/');
             prefix_parts.shift();

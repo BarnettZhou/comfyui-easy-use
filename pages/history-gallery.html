@@ -305,9 +305,9 @@
     </main>
 
     <!-- 全屏预览 -->
-    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex flex-col">
+    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center">
         <!-- 顶部操作栏 -->
-        <div class="relative z-20 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-20">
             <div class="flex items-center space-x-2">
                 <button onclick="closePreview()" class="flex items-center space-x-2 text-white/80 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/10">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,25 +328,25 @@
         </div>
         
         <!-- 图片区域 -->
-        <div class="flex-1 relative flex items-center justify-center overflow-hidden">
+        <div class="relative w-full h-full flex items-center justify-center pointer-events-none">
             <!-- 导航按钮 -->
-            <button id="prevBtn" onclick="prevImage(event)" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+            <button id="prevBtn" onclick="prevImage(event)" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10 pointer-events-auto">
                 <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                 </svg>
             </button>
-            <button id="nextBtn" onclick="nextImage(event)" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+            <button id="nextBtn" onclick="nextImage(event)" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10 pointer-events-auto">
                 <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                 </svg>
             </button>
             
             <!-- 图片 -->
-            <img id="previewImg" src="" class="max-h-[70vh] max-w-[90%] rounded-lg shadow-2xl object-contain">
+            <img id="previewImg" src="" class="max-h-[70vh] max-w-[90%] rounded-lg shadow-2xl object-contain pointer-events-auto">
         </div>
         
         <!-- 底部按钮栏 -->
-        <div class="relative z-20 p-4 flex justify-center items-center bg-gradient-to-t from-black/80 to-transparent">
+        <div class="absolute bottom-0 left-0 right-0 p-4 flex justify-center items-center bg-gradient-to-t from-black/80 to-transparent z-20">
             <button id="infoBtn" onclick="toggleInfoPopup()" class="flex items-center space-x-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-full transition-all border border-white/20">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>

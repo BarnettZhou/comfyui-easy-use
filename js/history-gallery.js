@@ -12,6 +12,15 @@ let isInfoPopupOpen = false; // 信息弹窗是否打开
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadStructure();
+
+    // 添加点击遮罩关闭预览功能
+    document.getElementById('fullPreview').addEventListener('click', function(event) {
+        console.log(event.target);
+        // 检查点击的目标是否是遮罩本身（而不是里面的按钮或图片）
+        if (event.target === this) {
+            closePreview();
+        }
+    });
 });
 
 /**
