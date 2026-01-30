@@ -189,6 +189,38 @@ async function loadImages(dirPath) {
     }
 }
 
+// 全局图片懒加载观察器
+let imageLazyObserver = null;
+
+/**
+ * 初始化图片懒加载观察器
+ */
+function initImageLazyObserver() {
+    // 如果已存在，先断开
+    if (imageLazyObserver) {
+        imageLazyObserver.disconnect();
+    }
+    
+    imageLazyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const img = entry.target;
+            if (entry.isIntersecting) {
+                // 进入视口，加载真实图片
+                const realSrc = img.getAttribute('data-src');
+                if (realSrc && img.src !== realSrc) {
+                    img.src = realSrc;
+                }
+            } else {
+                // 离开视口，使用占位图（可选，用于内存优化）
+                // 注意：这里不移除 src，因为浏览器原生 loading="lazy" 已经处理了大部分优化
+            }
+        });
+    }, {
+        threshold: 0.1,
+        rootMargin: '50px' // 提前 50px 开始加载
+    });
+}
+
 /**
  * 渲染图片列表
  * @param {Array} files - 图片文件数组
@@ -214,15 +246,19 @@ function renderImages(files) {
     
     imageEmptyState.classList.add('hidden');
     
+    // 初始化懒加载观察器
+    initImageLazyObserver();
+    
     // 渲染图片卡片
     imageGrid.innerHTML = files.map((file, index) => `
-        <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer card-hover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+        <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer card-hover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 img-skeleton"
              onclick="openPreview(${index})">
-            <img src="/api/easy-use/files/${file.path}" 
+            <img data-src="/api/easy-use/files/${file.path}" 
                  alt="${file.name}"
-                 class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                 class="lazy-image w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                  loading="lazy"
-                 onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-slate-400\\'><span class=\\'text-xs\\'>加载失败</span></div>'">
+                 onload="this.parentElement.classList.remove('img-skeleton')"
+                 onerror="this.parentElement.classList.remove('img-skeleton'); this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-slate-400\\'><span class=\\'text-xs\\'>加载失败</span></div>'">
             <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <div class="absolute bottom-0 left-0 right-0 p-3">
                     <p class="text-white text-xs truncate">${file.name}</p>
@@ -231,6 +267,12 @@ function renderImages(files) {
             </div>
         </div>
     `).join('');
+    
+    // 为所有懒加载图片添加观察
+    const lazyImages = imageGrid.querySelectorAll('.lazy-image');
+    lazyImages.forEach(img => {
+        imageLazyObserver.observe(img);
+    });
 }
 
 /**
