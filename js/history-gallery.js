@@ -6,6 +6,7 @@
 let currentPath = ''; // 当前目录路径（相对于 easy-use）
 let currentImages = []; // 当前目录下的图片列表
 let currentPreviewIndex = -1; // 当前预览的图片索引
+let currentPromptInfo = null; // 当前图片的 prompt 信息
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -257,7 +258,7 @@ async function refreshCurrentView() {
  * 打开全屏预览
  * @param {number} index - 图片索引
  */
-function openPreview(index) {
+async function openPreview(index) {
     currentPreviewIndex = index;
     const preview = document.getElementById('fullPreview');
     const img = document.getElementById('previewImg');
@@ -270,6 +271,12 @@ function openPreview(index) {
     
     // 更新导航按钮状态
     updateNavButtons();
+    
+    // 重置信息面板
+    resetInfoPanel();
+    
+    // 解析图片信息
+    await parseImageInfo(currentImages[index].fullPath);
 }
 
 /**
@@ -283,27 +290,36 @@ function closePreview() {
     // 恢复背景滚动
     document.body.style.overflow = '';
     currentPreviewIndex = -1;
+    currentPromptInfo = null;
 }
 
 /**
  * 显示上一张图片
+ * @param {Event} event - 事件对象
  */
-function prevImage() {
+async function prevImage(event) {
+    event.stopPropagation();
     if (currentPreviewIndex > 0) {
         currentPreviewIndex--;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
         updateNavButtons();
+        resetInfoPanel();
+        await parseImageInfo(currentImages[currentPreviewIndex].fullPath);
     }
 }
 
 /**
  * 显示下一张图片
+ * @param {Event} event - 事件对象
  */
-function nextImage() {
+async function nextImage(event) {
+    event.stopPropagation();
     if (currentPreviewIndex < currentImages.length - 1) {
         currentPreviewIndex++;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
         updateNavButtons();
+        resetInfoPanel();
+        await parseImageInfo(currentImages[currentPreviewIndex].fullPath);
     }
 }
 
@@ -328,6 +344,201 @@ function openInNewTab() {
     if (currentPreviewIndex >= 0 && currentPreviewIndex < currentImages.length) {
         window.open(currentImages[currentPreviewIndex].fullPath, '_blank');
     }
+}
+
+/**
+ * 重置信息面板
+ */
+function resetInfoPanel() {
+    document.getElementById('infoLoading').classList.remove('hidden');
+    document.getElementById('infoContent').classList.add('hidden');
+    document.getElementById('infoEmpty').classList.add('hidden');
+    document.getElementById('copyHint').classList.add('opacity-0');
+}
+
+/**
+ * 解析 PNG 图片中的 ComfyUI prompt 信息
+ * @param {string} imageUrl - 图片 URL
+ */
+async function parseImageInfo(imageUrl) {
+    try {
+        const response = await fetch(imageUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // 解析 PNG 获取 prompt 信息
+        const promptData = extractPromptFromPNG(uint8Array);
+        
+        if (promptData) {
+            currentPromptInfo = promptData;
+            displayInfo(promptData);
+        } else {
+            showEmptyInfo();
+        }
+    } catch (error) {
+        console.error('解析图片信息失败:', error);
+        showEmptyInfo();
+    }
+}
+
+/**
+ * 从 PNG 二进制数据中提取 prompt 信息
+ * @param {Uint8Array} uint8Array - PNG 文件数据
+ * @returns {Object|null} 解析后的 prompt 信息
+ */
+function extractPromptFromPNG(uint8Array) {
+    try {
+        // PNG 文件头签名
+        const pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        for (let i = 0; i < 8; i++) {
+            if (uint8Array[i] !== pngSignature[i]) {
+                console.error('不是有效的 PNG 文件');
+                return null;
+            }
+        }
+        
+        let offset = 8; // 跳过 PNG 签名
+        
+        while (offset < uint8Array.length) {
+            // 读取块长度（4字节，大端序）
+            const length = (uint8Array[offset] << 24) | 
+                          (uint8Array[offset + 1] << 16) | 
+                          (uint8Array[offset + 2] << 8) | 
+                          uint8Array[offset + 3];
+            
+            // 读取块类型（4字节）
+            const type = String.fromCharCode(
+                uint8Array[offset + 4],
+                uint8Array[offset + 5],
+                uint8Array[offset + 6],
+                uint8Array[offset + 7]
+            );
+            
+            // 检查是否是 tEXt 块
+            if (type === 'tEXt' || type === 'iTXt') {
+                const dataStart = offset + 8;
+                const dataEnd = dataStart + length;
+                const data = uint8Array.slice(dataStart, dataEnd);
+                
+                let nullIndex = data.indexOf(0);
+                const keyword = new TextDecoder().decode(data.slice(0, nullIndex));
+                
+                // ComfyUI 的关键字通常是 'prompt'
+                if (keyword === 'parameters' || keyword === 'prompt') {
+                    try {
+                        let text;
+                        if (type === 'iTXt') {
+                            // iTXt 结构较复杂：Keyword(null)Compression(null)Method(null)Lang(null)Tag(null)Text
+                            // 这里简化处理，跳过前面的元数据找到实际内容
+                            text = new TextDecoder().decode(data.slice(nullIndex + 5)); 
+                        } else {
+                            text = new TextDecoder().decode(data.slice(nullIndex + 1));
+                        }
+                        const prompt = JSON.parse(text);
+                        return extractPromptData(prompt);
+                    } catch (e) {
+                        console.error('解析 JSON 失败:', e);
+                    }
+                }
+            }
+            
+            // IEND 块，结束解析
+            if (type === 'IEND') {
+                break;
+            }
+            
+            // 移动到下一个块（长度 + 类型 + 数据 + CRC）
+            offset += 12 + length;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('提取 PNG 信息失败:', error);
+        return null;
+    }
+}
+
+/**
+ * 从解析的 prompt 对象中提取需要的数据
+ * @param {Object} prompt - 解析后的 prompt JSON
+ * @returns {Object} 提取的信息
+ */
+function extractPromptData(prompt) {
+    const width = prompt['5']?.inputs?.width || '-';
+    const height = prompt['5']?.inputs?.height || '-';
+    const model = prompt['34']?.inputs?.unet_name || '-';
+    const samplerName = prompt['3']?.inputs?.sampler_name || '-';
+    const scheduler = prompt['3']?.inputs?.scheduler || '-';
+    const steps = prompt['3']?.inputs?.steps || '-';
+    const cfgScale = prompt['3']?.inputs?.cfg || '-';
+    const seed = prompt['3']?.inputs?.seed || '-';
+    const promptText = prompt['6']?.inputs?.text || '';
+    
+    return {
+        size: width !== '-' && height !== '-' ? `${width} × ${height}` : '-',
+        model: model,
+        sampler: samplerName,
+        scheduler: scheduler,
+        steps: steps,
+        cfg: cfgScale,
+        seed: seed,
+        prompt: promptText
+    };
+}
+
+/**
+ * 显示图片信息
+ * @param {Object} info - 图片信息对象
+ */
+function displayInfo(info) {
+    document.getElementById('infoLoading').classList.add('hidden');
+    document.getElementById('infoContent').classList.remove('hidden');
+    document.getElementById('infoEmpty').classList.add('hidden');
+    
+    document.getElementById('infoSize').textContent = info.size;
+    document.getElementById('infoModel').textContent = info.model;
+    document.getElementById('infoModel').title = info.model;
+    document.getElementById('infoSampler').textContent = info.sampler;
+    document.getElementById('infoScheduler').textContent = info.scheduler;
+    document.getElementById('infoSteps').textContent = info.steps;
+    document.getElementById('infoCfg').textContent = info.cfg;
+    document.getElementById('infoSeed').textContent = info.seed;
+    document.getElementById('infoSeed').title = info.seed;
+    document.getElementById('infoPrompt').textContent = info.prompt || '无提示词';
+}
+
+/**
+ * 显示无信息状态
+ */
+function showEmptyInfo() {
+    document.getElementById('infoLoading').classList.add('hidden');
+    document.getElementById('infoContent').classList.add('hidden');
+    document.getElementById('infoEmpty').classList.remove('hidden');
+}
+
+/**
+ * 复制提示词
+ */
+function copyPrompt() {
+    if (currentPromptInfo && currentPromptInfo.prompt) {
+        navigator.clipboard.writeText(currentPromptInfo.prompt).then(() => {
+            const copyHint = document.getElementById('copyHint');
+            copyHint.classList.remove('opacity-0');
+            setTimeout(() => {
+                copyHint.classList.add('opacity-0');
+            }, 2000);
+        }).catch(err => {
+            console.error('复制失败:', err);
+            showToast('复制失败', 'error');
+        });
+    }
+}
+
+/**
+ * 从信息面板复制提示词（供顶部按钮使用）
+ */
+function copyPromptFromInfo() {
+    copyPrompt();
 }
 
 /**
@@ -417,10 +628,22 @@ document.addEventListener('keydown', (e) => {
             closePreview();
             break;
         case 'ArrowLeft':
-            prevImage();
+            if (currentPreviewIndex > 0) {
+                currentPreviewIndex--;
+                document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
+                updateNavButtons();
+                resetInfoPanel();
+                parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+            }
             break;
         case 'ArrowRight':
-            nextImage();
+            if (currentPreviewIndex < currentImages.length - 1) {
+                currentPreviewIndex++;
+                document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
+                updateNavButtons();
+                resetInfoPanel();
+                parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+            }
             break;
     }
 });
