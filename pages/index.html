@@ -207,7 +207,7 @@
     </nav>
 
     <!-- 主内容区 -->
-    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 pb-32">
         
         <!-- 提示词区域 -->
         <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden card-hover transition-colors duration-300">
@@ -493,38 +493,15 @@
             </div>
         </section>
 
-        <!-- 操作按钮区 -->
-        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="md:col-span-2 grid grid-cols-3 gap-3">
-                <button id="generateBtn" onclick="queuePrompt()" class="col-span-2 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-4 px-6 rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                    <span>开始生成</span>
-                </button>
-                <div class="relative">
-                    <select id="batchCount" class="w-full h-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 pr-10 outline-none appearance-none text-center font-medium transition-colors duration-300 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700">
-                        <option value="1">1 张</option>
-                        <option value="2">2 张</option>
-                        <option value="4">4 张</option>
-                        <option value="8">8 张</option>
-                        <option value="12">12 张</option>
-                        <option value="16">16 张</option>
-                    </select>
-                    <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 gap-3">
-                <button onclick="interruptTask('current')" class="bg-amber-500 hover:bg-amber-600 text-white py-4 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center space-x-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="hidden sm:inline">取消当前</span>
-                    <span class="sm:hidden">取消</span>
-                </button>
-            </div>
+        <!-- 取消按钮区 -->
+        <section class="grid grid-cols-1 gap-4">
+            <button onclick="interruptTask('current')" class="bg-amber-500 hover:bg-amber-600 text-white py-4 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="hidden sm:inline">取消当前</span>
+                <span class="sm:hidden">取消</span>
+            </button>
         </section>
 
         <!-- 生成结果 -->
@@ -551,6 +528,38 @@
             </div>
         </section>
     </main>
+
+    <!-- 底部悬浮生成按钮区 -->
+    <div class="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+            <div class="glass rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 border border-slate-200/50 dark:border-slate-700/50 p-3">
+                <div class="flex items-center gap-3">
+                    <!-- 开始生成按钮 -->
+                    <button id="generateBtn" onclick="queuePrompt()" class="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3.5 px-6 rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none active:scale-[0.98]">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <span>开始生成</span>
+                    </button>
+                    
+                    <!-- 数量选择 -->
+                    <div class="relative flex-shrink-0">
+                        <select id="batchCount" class="h-[50px] w-20 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-3 pr-8 outline-none appearance-none text-center font-medium transition-colors duration-300 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700">
+                            <option value="1">1 张</option>
+                            <option value="2">2 张</option>
+                            <option value="4">4 张</option>
+                            <option value="8">8 张</option>
+                            <option value="12">12 张</option>
+                            <option value="16">16 张</option>
+                        </select>
+                        <svg class="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 抽屉遮罩 -->
     <div id="drawerOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden transition-opacity opacity-0"></div>
