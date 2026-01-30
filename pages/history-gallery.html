@@ -163,52 +163,54 @@
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
 
     <!-- 顶部导航栏 -->
-    <nav class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-700 transition-colors duration-300">
+    <nav class="sticky top-0 z-40 glass border-b border-slate-200/80 dark:border-slate-700/80 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30">
+                <a href="/" class="flex items-center space-x-3 group">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25 group-hover:shadow-primary-500/40 group-hover:scale-105 transition-all duration-300">
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                         </svg>
                     </div>
-                    <div>
-                        <h1 class="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
-                            <span class="hidden sm:inline">文件浏览器</span>
-                            <span class="sm:hidden"></span>
+                    <div class="hidden sm:block">
+                        <h1 class="text-lg font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
+                            文件浏览器
                         </h1>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">浏览 easy-use 目录</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">浏览 easy-use 目录</p>
                     </div>
-                </div>
+                </a>
 
                 <!-- 右侧按钮组 -->
-                <div class="flex items-center space-x-2 sm:space-x-3">
+                <div class="flex items-center gap-2 sm:gap-3">
                     <!-- 主题切换按钮 -->
-                    <button onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 group" title="切换主题">
-                        <!-- 太阳图标（暗黑模式下显示） -->
+                    <button onclick="toggleTheme()" 
+                            class="relative p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all duration-200" 
+                            title="切换主题">
                         <svg class="w-5 h-5 text-amber-500 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
                         </svg>
-                        <!-- 月亮图标（白天模式下显示） -->
                         <svg class="w-5 h-5 text-slate-600 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                         </svg>
                     </button>
 
                     <!-- 刷新按钮 -->
-                    <button id="refreshBtn" onclick="refreshCurrentView()" class="flex items-center justify-center p-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white transition-all duration-200 text-sm font-medium shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50" title="刷新">
+                    <button id="refreshBtn" onclick="refreshCurrentView()" 
+                            class="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white transition-all duration-200 text-sm font-medium shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/30 active:scale-95" 
+                            title="刷新">
                         <svg id="refreshIcon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                         <svg id="refreshIconStatic" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
-                        <span class="hidden sm:inline ml-2">刷新</span>
+                        <span class="hidden sm:inline">刷新</span>
                     </button>
 
                     <!-- 返回控制台按钮 -->
-                    <button onclick="window.location.href='/'" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 text-sm font-medium">
+                    <button onclick="window.location.href='/'" 
+                            class="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all duration-200 text-sm font-medium text-slate-700 dark:text-slate-300">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                         </svg>
@@ -217,24 +219,30 @@
                 </div>
             </div>
         </div>
+
+        <!-- 面包屑区域 -->
+        <div class="py-2">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center text-sm text-slate-600 dark:text-slate-400">
+                    <button onclick="navigateToRoot()" class="flex items-center gap-1.5 hover:text-primary-600 dark:hover:text-primary-400 transition-colors p-1 -ml-1 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        <span class="font-medium">easy-use</span>
+                    </button>
+                    <svg class="w-4 h-4 mx-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                    <span id="breadcrumbContainer" class="flex items-center">
+                        <!-- 动态面包屑内容 -->
+                    </span>
+                </div>
+            </div>
+        </div>
     </nav>
 
     <!-- 主内容区 -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <!-- 面包屑导航 -->
-        <div class="mb-6">
-            <nav class="flex items-center text-sm text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-xl px-4 py-3 shadow-sm border border-slate-200 dark:border-slate-700">
-                <button onclick="navigateToRoot()" class="flex items-center space-x-2 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                    </svg>
-                    <span class="font-medium">easy-use</span>
-                </button>
-                <span id="breadcrumbContainer" class="flex items-center">
-                    <!-- 动态面包屑内容 -->
-                </span>
-            </nav>
-        </div>
 
         <!-- 目录区域 -->
         <section id="folderSection" class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300 mb-6">
