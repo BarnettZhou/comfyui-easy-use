@@ -76,7 +76,9 @@ const server = http.createServer((req, res) => {
     
     /**
      * 获取easy-use目录下的项目结构
-     * @returns {Object} 包含目录和图片信息的结构对象
+     * /api/easy-use/structure 返回根目录下的项目结构
+     * /api/easy-use/structure/{dir} 返回{dir}目录下的项目结构，支持递归查询
+     * @returns {Object} 包含目录结构的对象
      * @example
      * {
      *   "structure": [
@@ -84,53 +86,61 @@ const server = http.createServer((req, res) => {
      *       "name": "2026-01-11",
      *       "type": "directory",
      *       "path": "2026-01-11"
-     *     },
-     *     {
-     *       "name": "image_0001.png",
-     *       "type": "file",
-     *       "path": "image_0001.png",
-     *       "size": 12345,
-     *       "mtime": "2026-01-11T00:00:00.000Z"
      *     }
      *   ]
      * }
      */
-    if (req.url === '/api/easy-use/structure') {
+    if (req.url === '/api/easy-use/structure' || req.url.startsWith('/api/easy-use/structure/')) {
         try {
-            const easyUsePath = path.join(__dirname, '..', 'easy-use');
+            // 提取目录路径
+            let dirParam = '';
+            if (req.url.startsWith('/api/easy-use/structure/')) {
+                dirParam = req.url.replace('/api/easy-use/structure/', '');
+            }
+            
+            // 构建目标路径
+            const basePath = path.join(__dirname, '..', 'easy-use');
+            let targetPath = basePath;
+            
+            // 如果传入了目录参数，则使用传入的目录
+            if (dirParam) {
+                // 防止路径遍历攻击
+                if (dirParam.includes('..')) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '无效的路径' }), 'utf-8');
+                    return;
+                }
+                targetPath = path.join(basePath, dirParam);
+                
+                // 检查路径是否存在且是目录
+                if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isDirectory()) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '目录不存在' }), 'utf-8');
+                    return;
+                }
+            }
+            
             const structure = [];
             
-            // 读取easy-use目录下的所有项目
-            const items = fs.readdirSync(easyUsePath);
+            // 读取目录下的所有项目
+            const items = fs.readdirSync(targetPath);
             items.forEach(item => {
-                const itemPath = path.join(easyUsePath, item);
+                const itemPath = path.join(targetPath, item);
                 const stat = fs.statSync(itemPath);
                 
+                // 只返回目录
                 if (stat.isDirectory()) {
-                    // 对于目录，添加到结构中
+                    const fullPath = dirParam ? dirParam + '/' + item : item;
                     structure.push({
                         name: item,
                         type: 'directory',
-                        path: item
-                    });
-                } else if (stat.isFile() && ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(path.extname(item).toLowerCase())) {
-                    // 对于根目录下的图片文件
-                    structure.push({
-                        name: item,
-                        type: 'file',
-                        path: item,
-                        size: stat.size,
-                        mtime: stat.mtime.toISOString()
+                        path: fullPath
                     });
                 }
             });
             
-            // 按名称排序，目录在前，文件在后
-            structure.sort((a, b) => {
-                if (a.type === 'directory' && b.type === 'file') return -1;
-                if (a.type === 'file' && b.type === 'directory') return 1;
-                return a.name.localeCompare(b.name);
-            });
+            // 按名称排序
+            structure.sort((a, b) => a.name.localeCompare(b.name));
             
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ structure }), 'utf-8');
@@ -144,7 +154,7 @@ const server = http.createServer((req, res) => {
 
     /**
      * 获取指定目录下的图片列表
-     * @param {string} dirPath - 目录路径，相对于easy-use目录
+     * @param {string} dirPath - 目录路径，相对于easy-use目录，支持递归查询
      * @returns {Object} 包含图片信息的对象
      * @example
      * {
