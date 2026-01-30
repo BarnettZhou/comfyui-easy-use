@@ -9,6 +9,7 @@
     "loras": [
         "pixel_art_style_z_image_turbo.safetensors"
     ],
+    "output_dir": "easy-use",
     "prefix": "zit",
     "size_map": {
         "1:1": [

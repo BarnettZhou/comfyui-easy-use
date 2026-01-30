@@ -356,8 +356,9 @@ async function queuePrompt() {
             const date_str = new Date().toISOString().split('T')[0];
             prefix = prefix.replace(/%date%/g, date_str);
         }
-        p["9"].inputs.filename_prefix = prefix;
-        if (p["42"]) p["42"].inputs.filename_prefix = prefix;
+        const filename_prefix = config.output_dir + "/" + prefix;
+        p["9"].inputs.filename_prefix = filename_prefix;
+        if (p["42"]) p["42"].inputs.filename_prefix = filename_prefix;
 
         for(let i = 0; i < batchCount; i++) {
             if (shouldStop) break; 
@@ -866,11 +867,15 @@ async function sendToConsole() {
         // 文件名前缀
         let prefix = '';
         if (promptData["9"] && promptData["9"].inputs.filename_prefix) {
-            prefix = promptData["9"].inputs.filename_prefix;
-            document.getElementById('filePrefix').value = prefix;
+            let prefix_parts = promptData["9"].inputs.filename_prefix.split('/');
+            prefix_parts.shift();
+            document.getElementById('filePrefix').value = prefix_parts.join('/');;
         }
+
         if (promptData["42"] && promptData["42"].inputs.filename_prefix) {
-            document.getElementById('filePrefix').value = promptData["42"].inputs.filename_prefix;
+            let prefix_parts = promptData["42"].inputs.filename_prefix.split('/');
+            prefix_parts.shift();
+            document.getElementById('filePrefix').value = prefix_parts.join('/');
         }
 
         // 关闭预览
