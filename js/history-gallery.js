@@ -11,7 +11,11 @@ let isInfoPopupOpen = false; // 信息弹窗是否打开
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
-    loadStructure();
+    // 同时加载根目录的目录结构和图片
+    Promise.all([
+        loadStructure(),
+        loadRootImages()
+    ]);
 
     // 添加点击遮罩关闭预览功能
     document.getElementById('fullPreview').addEventListener('click', function(event) {
@@ -25,20 +29,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /**
  * 加载目录结构
+ * @param {string} dirPath - 目录路径，默认为空（根目录）
  */
-async function loadStructure() {
+async function loadStructure(dirPath = '') {
     try {
         showLoading(true);
-        const response = await fetch('/api/easy-use/structure');
+        const url = dirPath ? `/api/easy-use/structure/${dirPath}` : '/api/easy-use/structure';
+        const response = await fetch(url);
         if (!response.ok) throw new Error('获取目录结构失败');
         
         const data = await response.json();
         renderStructure(data.structure);
-        
-        // 如果当前在根目录，也加载根目录下的图片
-        if (!currentPath) {
-            renderRootImages(data.structure);
-        }
     } catch (error) {
         console.error('加载目录结构失败:', error);
         showToast('加载目录结构失败', 'error');
@@ -84,64 +85,24 @@ function renderStructure(structure) {
     `).join('');
 }
 
-/**
- * 渲染根目录下的图片
- * @param {Array} structure - 目录结构数组
- */
-function renderRootImages(structure) {
-    const imageGrid = document.getElementById('imageGrid');
-    const imageEmptyState = document.getElementById('imageEmptyState');
-    const imageCount = document.getElementById('imageCount');
-    
-    // 过滤出根目录下的图片文件
-    const images = structure.filter(item => item.type === 'file');
-    currentImages = images.map(img => ({
-        ...img,
-        fullPath: `/api/easy-use/files/${img.path}`
-    }));
-    
-    // 更新图片计数
-    imageCount.textContent = `${images.length} 张图片`;
-    
-    if (images.length === 0) {
-        imageGrid.innerHTML = '';
-        imageEmptyState.classList.remove('hidden');
-        return;
-    }
-    
-    imageEmptyState.classList.add('hidden');
-    
-    // 渲染图片卡片
-    imageGrid.innerHTML = images.map((image, index) => `
-        <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer card-hover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
-             onclick="openPreview(${index})">
-            <img src="/api/easy-use/files/${image.path}" 
-                 alt="${image.name}"
-                 class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                 loading="lazy"
-                 onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-slate-400\\'><span class=\\'text-xs\\'>加载失败</span></div>'">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <div class="absolute bottom-0 left-0 right-0 p-3">
-                    <p class="text-white text-xs truncate">${image.name}</p>
-                    <p class="text-white/70 text-xs">${formatFileSize(image.size)}</p>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
+
 
 /**
  * 导航到指定目录
- * @param {string} path - 目录路径
+ * @param {string} folderPath - 目录路径
  */
-async function navigateToFolder(path) {
-    currentPath = path;
+async function navigateToFolder(folderPath) {
+    currentPath = folderPath;
     updateBreadcrumb();
     
-    // 隐藏目录区域（进入子目录后只显示图片）
-    document.getElementById('folderSection').classList.add('hidden');
+    // 始终显示目录区域和图片区域
+    document.getElementById('folderSection').classList.remove('hidden');
     
-    await loadImages(path);
+    // 同时加载子目录和图片
+    await Promise.all([
+        loadStructure(folderPath),
+        loadImages(folderPath)
+    ]);
 }
 
 /**
@@ -157,6 +118,26 @@ function navigateToRoot() {
     
     updateBreadcrumb();
     loadStructure();
+    loadRootImages();
+}
+
+/**
+ * 加载根目录下的图片
+ */
+async function loadRootImages() {
+    try {
+        showLoading(true);
+        const response = await fetch('/api/easy-use/images/');
+        if (!response.ok) throw new Error('获取图片列表失败');
+        
+        const data = await response.json();
+        renderImages(data.files);
+    } catch (error) {
+        console.error('加载图片失败:', error);
+        showToast('加载图片失败', 'error');
+    } finally {
+        showLoading(false);
+    }
 }
 
 /**
@@ -195,7 +176,7 @@ function updateBreadcrumb() {
 async function loadImages(dirPath) {
     try {
         showLoading(true);
-        const response = await fetch(`/api/easy-use/images/${encodeURIComponent(dirPath)}`);
+        const response = await fetch(`/api/easy-use/images/${dirPath}`);
         if (!response.ok) throw new Error('获取图片列表失败');
         
         const data = await response.json();
@@ -257,9 +238,15 @@ function renderImages(files) {
  */
 async function refreshCurrentView() {
     if (currentPath) {
-        await loadImages(currentPath);
+        await Promise.all([
+            loadStructure(currentPath),
+            loadImages(currentPath)
+        ]);
     } else {
-        await loadStructure();
+        await Promise.all([
+            loadStructure(),
+            loadRootImages()
+        ]);
     }
     showToast('刷新成功');
 }
