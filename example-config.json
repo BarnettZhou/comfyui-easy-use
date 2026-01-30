@@ -1,10 +1,16 @@
 {
     "port": 8000,
     "diffusion_models": [
-        "z_image_turbo_bf16.safetensors"
+        {
+            "value": "z_image_turbo_bf16.safetensors",
+            "text": "Z-Image-Turbo"
+        }
     ],
     "vae_models": [
-        "ae.safetensors"
+        {
+            "value": "ae.safetensors",
+            "text": "ZIT VAE"
+        }
     ],
     "loras": [
         "pixel_art_style_z_image_turbo.safetensors"

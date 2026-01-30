@@ -35,6 +35,7 @@
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-out forwards',
                         'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'slide-down': 'slideDown 0.3s ease-out forwards',
                         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     },
                     keyframes: {
@@ -43,8 +44,12 @@
                             '100%': { opacity: '1', transform: 'translateY(0)' },
                         },
                         slideUp: {
-                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '0%': { opacity: '0', transform: 'translateY(100%)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideDown: {
+                            '0%': { opacity: '1', transform: 'translateY(0)' },
+                            '100%': { opacity: '0', transform: 'translateY(100%)' },
                         }
                     }
                 }
@@ -136,16 +141,13 @@
             color: #64748b;
         }
         
-        /* 预览信息面板滚动条 */
-        .info-panel::-webkit-scrollbar {
-            width: 6px;
+        /* 底部 popup 动画 */
+        .info-popup {
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .info-panel::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 3px;
-        }
-        .info-panel::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
+        .info-popup.show {
+            transform: translateY(0);
         }
         
         /* 提示词可复制样式 */
@@ -154,7 +156,7 @@
             transition: all 0.2s ease;
         }
         .prompt-text:hover {
-            background: rgba(59, 130, 246, 0.2);
+            background: rgba(59, 130, 246, 0.1);
         }
     </style>
 </head>
@@ -295,122 +297,156 @@
     </main>
 
     <!-- 全屏预览 -->
-    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50">
-        <!-- 遮罩层（点击关闭） -->
-        <div id="previewOverlay" class="absolute inset-0" onclick="closePreview()"></div>
+    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex flex-col">
+        <!-- 顶部操作栏 -->
+        <div class="relative z-20 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+            <div class="flex items-center space-x-2">
+                <button onclick="closePreview()" class="flex items-center space-x-2 text-white/80 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    <span>关闭</span>
+                </button>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openInNewTab()" class="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    <span class="hidden sm:inline">新标签页打开</span>
+                    <span class="sm:hidden">打开</span>
+                </button>
+            </div>
+        </div>
         
-        <!-- 内容容器 -->
-        <div class="relative w-full h-full flex flex-col">
-            <!-- 顶部操作栏 -->
-            <div class="relative z-10 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
-                <div class="flex items-center space-x-2">
-                    <button onclick="closePreview()" class="flex items-center space-x-2 text-white/80 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/10">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                        <span>关闭</span>
-                    </button>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <button onclick="copyPromptFromInfo()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
-                        <span class="hidden sm:inline">复制提示词</span>
-                        <span class="sm:hidden">复制</span>
-                    </button>
-                    <button onclick="openInNewTab()" class="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                        </svg>
-                        <span class="hidden sm:inline">新标签页打开</span>
-                        <span class="sm:hidden">打开</span>
-                    </button>
-                </div>
+        <!-- 图片区域 -->
+        <div class="flex-1 relative flex items-center justify-center overflow-hidden">
+            <!-- 导航按钮 -->
+            <button id="prevBtn" onclick="prevImage(event)" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+                <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <button id="nextBtn" onclick="nextImage(event)" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
+                <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+            
+            <!-- 图片 -->
+            <img id="previewImg" src="" class="max-h-[70vh] max-w-[90%] rounded-lg shadow-2xl object-contain">
+        </div>
+        
+        <!-- 底部按钮栏 -->
+        <div class="relative z-20 p-4 flex justify-center items-center bg-gradient-to-t from-black/80 to-transparent">
+            <button id="infoBtn" onclick="toggleInfoPopup()" class="flex items-center space-x-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-full transition-all border border-white/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>图片信息</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 图片信息 Popup (从底部弹出) -->
+    <div id="infoPopup" class="fixed inset-0 z-[60] hidden">
+        <!-- 遮罩层 -->
+        <div id="infoPopupOverlay" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" onclick="closeInfoPopup()"></div>
+        
+        <!-- Popup 内容 -->
+        <div id="infoPopupContent" class="info-popup absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-3xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <!-- 拖动条 -->
+            <div class="flex justify-center pt-3 pb-2" onclick="closeInfoPopup()">
+                <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
             </div>
             
-            <!-- 主要内容区 -->
-            <div class="flex-1 flex items-center justify-center relative overflow-hidden">
-                <!-- 导航按钮 -->
-                <button id="prevBtn" onclick="prevImage(event)" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
-                    <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            <!-- 标题栏 -->
+            <div class="px-6 py-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200">图片信息</h3>
+                <button onclick="closeInfoPopup()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
-                <button id="nextBtn" onclick="nextImage(event)" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm p-3 sm:p-4 rounded-full transition-all opacity-70 hover:opacity-100 z-10">
-                    <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                </button>
+            </div>
+            
+            <!-- 内容区域 -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- 加载状态 -->
+                <div id="popupInfoLoading" class="text-center py-8">
+                    <div class="inline-block w-8 h-8 border-3 border-primary-200 dark:border-primary-800 border-t-primary-600 rounded-full animate-spin"></div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-3">正在解析图片信息...</p>
+                </div>
                 
-                <!-- 图片 -->
-                <img id="previewImg" src="" class="max-h-[50vh] sm:max-h-[55vh] max-w-[90%] rounded-lg shadow-2xl z-10 object-contain" onclick="event.stopPropagation()">
-            </div>
-            
-            <!-- 信息展示面板 -->
-            <div id="infoPanel" class="relative z-10 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-4 sm:p-6">
-                <div class="max-w-4xl mx-auto">
-                    <!-- 加载状态 -->
-                    <div id="infoLoading" class="text-center py-4">
-                        <div class="inline-block w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span class="text-white/70 text-sm ml-2">正在解析图片信息...</span>
-                    </div>
-                    
-                    <!-- 信息内容 -->
-                    <div id="infoContent" class="hidden">
-                        <!-- 基础信息网格 -->
-                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                                <p class="text-white/50 text-xs mb-1">尺寸</p>
-                                <p id="infoSize" class="text-white text-sm font-mono">-</p>
-                            </div>
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                                <p class="text-white/50 text-xs mb-1">模型</p>
-                                <p id="infoModel" class="text-white text-sm truncate" title="">-</p>
-                            </div>
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                                <p class="text-white/50 text-xs mb-1">采样器</p>
-                                <p id="infoSampler" class="text-white text-sm">-</p>
-                            </div>
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                                <p class="text-white/50 text-xs mb-1">调度器</p>
-                                <p id="infoScheduler" class="text-white text-sm">-</p>
-                            </div>
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                                <p class="text-white/50 text-xs mb-1">步数</p>
-                                <p id="infoSteps" class="text-white text-sm font-mono">-</p>
-                            </div>
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                                <p class="text-white/50 text-xs mb-1">CFG Scale</p>
-                                <p id="infoCfg" class="text-white text-sm font-mono">-</p>
-                            </div>
-                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center col-span-2 sm:col-span-4 lg:col-span-1">
-                                <p class="text-white/50 text-xs mb-1">种子</p>
-                                <p id="infoSeed" class="text-white text-sm font-mono truncate" title="">-</p>
-                            </div>
+                <!-- 信息内容 -->
+                <div id="popupInfoContent" class="hidden space-y-4">
+                    <!-- 基础信息网格 -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">尺寸</p>
+                            <p id="popupInfoSize" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
                         </div>
-                        
-                        <!-- 提示词 -->
-                        <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-white/50 text-xs">提示词（点击复制）</p>
-                                <span id="copyHint" class="text-emerald-400 text-xs opacity-0 transition-opacity">已复制!</span>
-                            </div>
-                            <p id="infoPrompt" class="prompt-text text-white/90 text-sm leading-relaxed rounded-lg p-2 -mx-2" onclick="copyPrompt()">-</p>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">采样器</p>
+                            <p id="popupInfoSampler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">步数</p>
+                            <p id="popupInfoSteps" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">CFG</p>
+                            <p id="popupInfoCfg" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
                         </div>
                     </div>
                     
-                    <!-- 无信息状态 -->
-                    <div id="infoEmpty" class="hidden text-center py-4">
-                        <p class="text-white/50 text-sm">未能解析到图片生成信息</p>
+                    <!-- 更多详情 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">调度器</p>
+                            <p id="popupInfoScheduler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">模型</p>
+                            <p id="popupInfoModel" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">种子</p>
+                            <p id="popupInfoSeed" class="text-slate-800 dark:text-slate-200 text-sm font-mono truncate" title="">-</p>
+                        </div>
                     </div>
+                    
+                    <!-- 提示词 -->
+                    <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">提示词</p>
+                            <button onclick="copyPromptFromPopup()" class="flex items-center space-x-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors text-sm px-3 py-1.5 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>复制</span>
+                            </button>
+                        </div>
+                        <p id="popupInfoPrompt" class="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap break-words">-</p>
+                    </div>
+                </div>
+                
+                <!-- 无信息状态 -->
+                <div id="popupInfoEmpty" class="hidden text-center py-8">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                        <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">未能解析到图片生成信息</p>
+                    <p class="text-slate-400 dark:text-slate-500 text-xs mt-1">该图片可能不是由 ComfyUI 生成</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Toast通知 -->
-    <div id="toast" class="fixed top-5 right-5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 py-4 px-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 transform translate-x-full opacity-0 transition-all duration-300 z-50 flex items-center space-x-3">
+    <div id="toast" class="fixed top-5 right-5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 py-4 px-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 transform translate-x-full opacity-0 transition-all duration-300 z-[70] flex items-center space-x-3">
         <div id="toastIcon" class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
             <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>

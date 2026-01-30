@@ -7,6 +7,7 @@ let currentPath = ''; // 当前目录路径（相对于 easy-use）
 let currentImages = []; // 当前目录下的图片列表
 let currentPreviewIndex = -1; // 当前预览的图片索引
 let currentPromptInfo = null; // 当前图片的 prompt 信息
+let isInfoPopupOpen = false; // 信息弹窗是否打开
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -272,11 +273,8 @@ async function openPreview(index) {
     // 更新导航按钮状态
     updateNavButtons();
     
-    // 重置信息面板
-    resetInfoPanel();
-    
-    // 解析图片信息
-    await parseImageInfo(currentImages[index].fullPath);
+    // 预解析图片信息（但不显示）
+    await preloadImageInfo(currentImages[index].fullPath);
 }
 
 /**
@@ -286,6 +284,9 @@ function closePreview() {
     const preview = document.getElementById('fullPreview');
     preview.classList.add('hidden');
     document.getElementById('previewImg').src = '';
+    
+    // 关闭信息弹窗（如果打开）
+    closeInfoPopup();
     
     // 恢复背景滚动
     document.body.style.overflow = '';
@@ -303,8 +304,13 @@ async function prevImage(event) {
         currentPreviewIndex--;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
         updateNavButtons();
-        resetInfoPanel();
-        await parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+        // 预加载新图片信息
+        await preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
+        // 如果弹窗已打开，更新显示
+        if (isInfoPopupOpen) {
+            resetPopupInfo();
+            await parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+        }
     }
 }
 
@@ -318,8 +324,13 @@ async function nextImage(event) {
         currentPreviewIndex++;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
         updateNavButtons();
-        resetInfoPanel();
-        await parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+        // 预加载新图片信息
+        await preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
+        // 如果弹窗已打开，更新显示
+        if (isInfoPopupOpen) {
+            resetPopupInfo();
+            await parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+        }
     }
 }
 
@@ -347,13 +358,85 @@ function openInNewTab() {
 }
 
 /**
- * 重置信息面板
+ * 预加载图片信息（不显示）
+ * @param {string} imageUrl - 图片 URL
  */
-function resetInfoPanel() {
-    document.getElementById('infoLoading').classList.remove('hidden');
-    document.getElementById('infoContent').classList.add('hidden');
-    document.getElementById('infoEmpty').classList.add('hidden');
-    document.getElementById('copyHint').classList.add('opacity-0');
+async function preloadImageInfo(imageUrl) {
+    try {
+        const response = await fetch(imageUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // 解析 PNG 获取 prompt 信息
+        const promptData = extractPromptFromPNG(uint8Array);
+        
+        if (promptData) {
+            currentPromptInfo = promptData;
+        }
+    } catch (error) {
+        console.error('预加载图片信息失败:', error);
+    }
+}
+
+/**
+ * 切换信息弹窗显示
+ */
+function toggleInfoPopup() {
+    if (isInfoPopupOpen) {
+        closeInfoPopup();
+    } else {
+        openInfoPopup();
+    }
+}
+
+/**
+ * 打开信息弹窗
+ */
+function openInfoPopup() {
+    const popup = document.getElementById('infoPopup');
+    const overlay = document.getElementById('infoPopupOverlay');
+    const content = document.getElementById('infoPopupContent');
+    
+    popup.classList.remove('hidden');
+    isInfoPopupOpen = true;
+    
+    // 显示动画
+    setTimeout(() => {
+        overlay.classList.remove('opacity-0');
+        content.classList.add('show');
+    }, 10);
+    
+    // 重置并加载信息
+    resetPopupInfo();
+    if (currentImages[currentPreviewIndex]) {
+        parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+    }
+}
+
+/**
+ * 关闭信息弹窗
+ */
+function closeInfoPopup() {
+    const popup = document.getElementById('infoPopup');
+    const overlay = document.getElementById('infoPopupOverlay');
+    const content = document.getElementById('infoPopupContent');
+    
+    overlay.classList.add('opacity-0');
+    content.classList.remove('show');
+    
+    setTimeout(() => {
+        popup.classList.add('hidden');
+        isInfoPopupOpen = false;
+    }, 300);
+}
+
+/**
+ * 重置弹窗信息状态
+ */
+function resetPopupInfo() {
+    document.getElementById('popupInfoLoading').classList.remove('hidden');
+    document.getElementById('popupInfoContent').classList.add('hidden');
+    document.getElementById('popupInfoEmpty').classList.add('hidden');
 }
 
 /**
@@ -371,13 +454,13 @@ async function parseImageInfo(imageUrl) {
         
         if (promptData) {
             currentPromptInfo = promptData;
-            displayInfo(promptData);
+            displayPopupInfo(promptData);
         } else {
-            showEmptyInfo();
+            showEmptyPopupInfo();
         }
     } catch (error) {
         console.error('解析图片信息失败:', error);
-        showEmptyInfo();
+        showEmptyPopupInfo();
     }
 }
 
@@ -487,58 +570,49 @@ function extractPromptData(prompt) {
 }
 
 /**
- * 显示图片信息
+ * 在弹窗中显示图片信息
  * @param {Object} info - 图片信息对象
  */
-function displayInfo(info) {
-    document.getElementById('infoLoading').classList.add('hidden');
-    document.getElementById('infoContent').classList.remove('hidden');
-    document.getElementById('infoEmpty').classList.add('hidden');
+function displayPopupInfo(info) {
+    document.getElementById('popupInfoLoading').classList.add('hidden');
+    document.getElementById('popupInfoContent').classList.remove('hidden');
+    document.getElementById('popupInfoEmpty').classList.add('hidden');
     
-    document.getElementById('infoSize').textContent = info.size;
-    document.getElementById('infoModel').textContent = info.model;
-    document.getElementById('infoModel').title = info.model;
-    document.getElementById('infoSampler').textContent = info.sampler;
-    document.getElementById('infoScheduler').textContent = info.scheduler;
-    document.getElementById('infoSteps').textContent = info.steps;
-    document.getElementById('infoCfg').textContent = info.cfg;
-    document.getElementById('infoSeed').textContent = info.seed;
-    document.getElementById('infoSeed').title = info.seed;
-    document.getElementById('infoPrompt').textContent = info.prompt || '无提示词';
+    document.getElementById('popupInfoSize').textContent = info.size;
+    document.getElementById('popupInfoModel').textContent = info.model;
+    document.getElementById('popupInfoModel').title = info.model;
+    document.getElementById('popupInfoSampler').textContent = info.sampler;
+    document.getElementById('popupInfoScheduler').textContent = info.scheduler;
+    document.getElementById('popupInfoSteps').textContent = info.steps;
+    document.getElementById('popupInfoCfg').textContent = info.cfg;
+    document.getElementById('popupInfoSeed').textContent = info.seed;
+    document.getElementById('popupInfoSeed').title = info.seed;
+    document.getElementById('popupInfoPrompt').textContent = info.prompt || '无提示词';
 }
 
 /**
  * 显示无信息状态
  */
-function showEmptyInfo() {
-    document.getElementById('infoLoading').classList.add('hidden');
-    document.getElementById('infoContent').classList.add('hidden');
-    document.getElementById('infoEmpty').classList.remove('hidden');
+function showEmptyPopupInfo() {
+    document.getElementById('popupInfoLoading').classList.add('hidden');
+    document.getElementById('popupInfoContent').classList.add('hidden');
+    document.getElementById('popupInfoEmpty').classList.remove('hidden');
 }
 
 /**
- * 复制提示词
+ * 从弹窗复制提示词
  */
-function copyPrompt() {
+function copyPromptFromPopup() {
     if (currentPromptInfo && currentPromptInfo.prompt) {
         navigator.clipboard.writeText(currentPromptInfo.prompt).then(() => {
-            const copyHint = document.getElementById('copyHint');
-            copyHint.classList.remove('opacity-0');
-            setTimeout(() => {
-                copyHint.classList.add('opacity-0');
-            }, 2000);
+            showToast('提示词已复制');
         }).catch(err => {
             console.error('复制失败:', err);
             showToast('复制失败', 'error');
         });
+    } else {
+        showToast('没有可复制的提示词', 'error');
     }
-}
-
-/**
- * 从信息面板复制提示词（供顶部按钮使用）
- */
-function copyPromptFromInfo() {
-    copyPrompt();
 }
 
 /**
@@ -623,6 +697,12 @@ document.addEventListener('keydown', (e) => {
     const preview = document.getElementById('fullPreview');
     if (preview.classList.contains('hidden')) return;
     
+    // 如果弹窗打开，ESC 先关闭弹窗
+    if (isInfoPopupOpen && e.key === 'Escape') {
+        closeInfoPopup();
+        return;
+    }
+    
     switch(e.key) {
         case 'Escape':
             closePreview();
@@ -632,8 +712,11 @@ document.addEventListener('keydown', (e) => {
                 currentPreviewIndex--;
                 document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
                 updateNavButtons();
-                resetInfoPanel();
-                parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+                preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
+                if (isInfoPopupOpen) {
+                    resetPopupInfo();
+                    parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+                }
             }
             break;
         case 'ArrowRight':
@@ -641,9 +724,17 @@ document.addEventListener('keydown', (e) => {
                 currentPreviewIndex++;
                 document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
                 updateNavButtons();
-                resetInfoPanel();
-                parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+                preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
+                if (isInfoPopupOpen) {
+                    resetPopupInfo();
+                    parseImageInfo(currentImages[currentPreviewIndex].fullPath);
+                }
             }
+            break;
+        case 'i':
+        case 'I':
+            // I 键切换信息弹窗
+            toggleInfoPopup();
             break;
     }
 });
