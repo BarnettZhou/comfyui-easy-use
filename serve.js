@@ -76,8 +76,10 @@ const server = http.createServer((req, res) => {
     
     /**
      * 获取easy-use目录下的项目结构
-     * /api/easy-use/structure 返回根目录下的项目结构
-     * /api/easy-use/structure/{dir} 返回{dir}目录下的项目结构，支持递归查询
+     * GET /api/easy-use/structure/{dir}
+     * 返回{dir}目录下的项目结构，支持递归查询
+     *
+     * @param {string} dirParam - 目录路径参数，可选
      * @returns {Object} 包含目录结构的对象
      * @example
      * {
@@ -90,13 +92,10 @@ const server = http.createServer((req, res) => {
      *   ]
      * }
      */
-    if (req.url === '/api/easy-use/structure' || req.url.startsWith('/api/easy-use/structure/')) {
+    if (req.url.startsWith('/api/easy-use/structure/')) {
         try {
             // 提取目录路径
-            let dirParam = '';
-            if (req.url.startsWith('/api/easy-use/structure/')) {
-                dirParam = req.url.replace('/api/easy-use/structure/', '');
-            }
+            let dirParam = req.url.replace('/api/easy-use/structure/', '');
             
             // 构建目标路径
             const basePath = path.join(__dirname, '..', 'easy-use');
@@ -154,7 +153,10 @@ const server = http.createServer((req, res) => {
 
     /**
      * 获取指定目录下的图片列表
-     * @param {string} dirPath - 目录路径，相对于easy-use目录，支持递归查询
+     * GET /api/easy-use/images/{dirPath}
+     * 返回{dirPath}目录下的图片列表，支持递归查询
+     *
+     * @param {string} dirPath - 目录路径，可选
      * @returns {Object} 包含图片信息的对象
      * @example
      * {
