@@ -96,6 +96,15 @@
             box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.4);
         }
         
+        /* 底部 popup 动画 */
+        .info-popup {
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .info-popup.show {
+            transform: translateY(0);
+        }
+        
         /* 图片加载占位 */
         .img-skeleton {
             background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
