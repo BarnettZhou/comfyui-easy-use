@@ -24,11 +24,11 @@ async function initServerConfig() {
         const port = config.port;
         SERVER = `http://${localIP}:${port}`;
 
-        // 从配置读取 ComfyUI 服务器地址
+        // 从配置读取 ComfyUI 服务器地址（如果配置中未指定，则使用浏览器当前访问的地址）
         const comfyuiHost = config.comfyui_host || localIP;
         const comfyuiPort = config.comfyui_port || config.port || 8188;
         COMFYUI_SERVER = `http://${comfyuiHost}:${comfyuiPort}`;
-        console.log('ComfyUI 服务器地址:', COMFYUI_SERVER);
+        console.log('ComfyUI 服务器地址:', COMFYUI_SERVER, config.comfyui_host ? '(来自配置文件)' : '(来自浏览器地址)');
     } catch (error) {
         console.error('加载配置文件失败:', error);
         showToast('加载配置失败，请检查服务器是否正常运行');

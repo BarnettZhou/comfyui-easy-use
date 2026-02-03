@@ -627,6 +627,9 @@ function closePreview() {
     }
 }
 
+// 当前预览的图片URL（用于生成结果预览）
+let currentResultPreviewUrl = null;
+
 // 预览生成结果图片（独立预览，不参与历史导航）
 function openResultPreview(url) {
     const preview = document.getElementById('fullPreview');
@@ -636,6 +639,7 @@ function openResultPreview(url) {
 
     // 显示预览但不设置当前索引，这样导航按钮将不会工作
     previewImg.src = url;
+    currentResultPreviewUrl = url;
     preview.classList.remove('hidden');
     // 禁用body滚动
     document.body.style.overflow = 'hidden';
