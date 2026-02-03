@@ -28,7 +28,7 @@ async function loadHistory() {
         await initServerConfig();
     }
 
-    const res = await fetch(`${SERVER}/history`);
+    const res = await fetch(`${COMFYUI_SERVER}/history`);
     const data = await res.json();
     const gallery = document.getElementById('historyGallery');
     const emptyState = document.getElementById('emptyState');
@@ -59,7 +59,7 @@ async function loadHistory() {
                     // 标记图片为已显示
                     displayedTaskIds.add(imageKey);
                     
-                    const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+                    const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
                     
                     // 创建外层容器 - 包含图片和信息
                     const container = document.createElement('div');

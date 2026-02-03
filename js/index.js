@@ -98,7 +98,7 @@ async function initConsole() {
 
 // 初始化 WebSocket 监听执行进度
 function setupWebSocket() {
-    const wsUrl = SERVER.replace('http', 'ws') + '/ws?clientId=easy_gen_client';
+    const wsUrl = COMFYUI_SERVER.replace('http', 'ws') + '/ws?clientId=easy_gen_client';
     socket = new WebSocket(wsUrl);
 
     socket.onmessage = (event) => {
@@ -364,7 +364,7 @@ async function queuePrompt() {
             if (shouldStop) break; 
             btn.innerText = `Running ${i + 1}/${batchCount}`;
 
-            const res = await fetch(`${SERVER}/prompt`, {
+            const res = await fetch(`${COMFYUI_SERVER}/prompt`, {
                 method: 'POST',
                 body: JSON.stringify({ prompt: p })
             });
@@ -397,7 +397,7 @@ function trackTask(id) {
     return new Promise((resolve) => {
         const timer = setInterval(async () => {
             try {
-                const res = await fetch(`${SERVER}/history/${id}`);
+                const res = await fetch(`${COMFYUI_SERVER}/history/${id}`);
                 const data = await res.json();
                 if(data[id]) {
                     clearInterval(timer);
@@ -432,7 +432,7 @@ function renderImg(outputs) {
 
     for (let nodeId of nodeIds) {
         outputs[nodeId].images.forEach(img => {
-            const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+            const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
             
             const wrapper = document.createElement('div');
             wrapper.className = 'relative group animate-fade-in';
@@ -459,7 +459,7 @@ function renderImg(outputs) {
 
 // ========== 历史记录 ==========
 async function loadHistory() {
-    const res = await fetch(`${SERVER}/history`);
+    const res = await fetch(`${COMFYUI_SERVER}/history`);
     const data = await res.json();
     const list = document.getElementById('historyList');
     const emptyState = document.getElementById('historyEmptyState');
@@ -471,7 +471,7 @@ async function loadHistory() {
         if (!item.outputs) return;
         for (let nid in item.outputs) {
             item.outputs[nid].images?.forEach(img => {
-                const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+                const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
                 const imageKey = `${taskId}-${nid}-${img.filename}`;
                 
                 if (!displayedTaskIds.has(imageKey)) {
@@ -590,10 +590,10 @@ async function loadHistory() {
 async function interruptTask(type) {
     shouldStop = true;
     if(type === 'all') {
-        await fetch(`${SERVER}/queue`, { method: 'POST', body: JSON.stringify({clear: true}) });
+        await fetch(`${COMFYUI_SERVER}/queue`, { method: 'POST', body: JSON.stringify({clear: true}) });
         alert("已请求清空队列");
     } else {
-        await fetch(`${SERVER}/interrupt`, { method: 'POST' });
+        await fetch(`${COMFYUI_SERVER}/interrupt`, { method: 'POST' });
     }
 }
 
@@ -696,7 +696,7 @@ async function clearHistory() {
     if (confirm('是否清空历史记录？')) {
         try {
             // 调用ComfyUI API清除历史记录
-            await fetch(`${SERVER}/history`, {
+            await fetch(`${COMFYUI_SERVER}/history`, {
                 method: 'POST',
                 body: JSON.stringify({clear: true})
             });
@@ -752,7 +752,7 @@ async function sendToConsole() {
 
     try {
         // 从服务器获取任务历史记录
-        const res = await fetch(`${SERVER}/history/${currentTaskId}`);
+        const res = await fetch(`${COMFYUI_SERVER}/history/${currentTaskId}`);
         const data = await res.json();
         const task = data[currentTaskId];
 

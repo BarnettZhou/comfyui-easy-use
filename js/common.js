@@ -8,6 +8,9 @@ function getLocalIPFromServer() {
     return currentHost;
 }
 
+// ComfyUI 服务器地址（从配置读取）
+let COMFYUI_SERVER;
+
 // 初始化服务器配置
 async function initServerConfig() {
     try {
@@ -15,11 +18,17 @@ async function initServerConfig() {
         const configResponse = await fetch('../config.json');
         config = await configResponse.json();
 
-        // 获取本地IP地址
+        // 获取本地IP地址（用于本服务）
         const localIP = getLocalIPFromServer();
-        console.log('服务IP地址:', localIP);
+        console.log('本服务IP地址:', localIP);
         const port = config.port;
         SERVER = `http://${localIP}:${port}`;
+
+        // 从配置读取 ComfyUI 服务器地址
+        const comfyuiHost = config.comfyui_host || localIP;
+        const comfyuiPort = config.comfyui_port || config.port || 8188;
+        COMFYUI_SERVER = `http://${comfyuiHost}:${comfyuiPort}`;
+        console.log('ComfyUI 服务器地址:', COMFYUI_SERVER);
     } catch (error) {
         console.error('加载配置文件失败:', error);
         showToast('加载配置失败，请检查服务器是否正常运行');
