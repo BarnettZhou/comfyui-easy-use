@@ -436,17 +436,32 @@ function renderImg(outputs) {
             
             const wrapper = document.createElement('div');
             wrapper.className = 'relative group animate-fade-in';
-            wrapper.innerHTML = `
-                <div class="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 img-skeleton">
-                    <img src="${url}" loading="lazy" onclick="openResultPreview('${url}')" 
-                        class="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                        onload="this.parentElement.classList.remove('img-skeleton')">
-                </div>
-                <span class="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm">
-                    ${nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图'}
-                </span>
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl"></div>
-            `;
+            
+            const imgWrapper = document.createElement('div');
+            imgWrapper.className = 'aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 img-skeleton';
+            
+            const imgEl = document.createElement('img');
+            imgEl.src = url;
+            imgEl.loading = 'lazy';
+            imgEl.className = 'w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300';
+            imgEl.onclick = () => openResultPreview(url);
+            imgEl.onload = function() {
+                this.parentElement.classList.remove('img-skeleton');
+            };
+            
+            imgWrapper.appendChild(imgEl);
+            
+            const label = document.createElement('span');
+            label.className = 'absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm';
+            label.textContent = nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl';
+            
+            wrapper.appendChild(imgWrapper);
+            wrapper.appendChild(label);
+            wrapper.appendChild(overlay);
+            
             container.prepend(wrapper);
             imageCount++;
         });
