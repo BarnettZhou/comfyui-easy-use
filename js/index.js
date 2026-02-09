@@ -1220,16 +1220,53 @@ function showEmptyPopupInfo() {
 }
 
 /**
+ * 复制文本到剪贴板（兼容移动端）
+ * @param {string} text - 要复制的文本
+ * @returns {Promise<boolean>} 是否复制成功
+ */
+async function copyToClipboard(text) {
+    if (!text) return false;
+    
+    // 尝试使用现代 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (err) {
+            console.log('Clipboard API 失败，尝试降级方案:', err);
+        }
+    }
+    
+    // 降级方案：使用 execCommand
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        return successful;
+    } catch (err) {
+        console.error('execCommand 复制失败:', err);
+        return false;
+    }
+}
+
+/**
  * 从弹窗复制提示词
  */
-function copyPromptFromPopup() {
+async function copyPromptFromPopup() {
     if (currentPromptInfo && currentPromptInfo.prompt) {
-        navigator.clipboard.writeText(currentPromptInfo.prompt).then(() => {
+        const success = await copyToClipboard(currentPromptInfo.prompt);
+        if (success) {
             showToast('提示词已复制');
-        }).catch(err => {
-            console.error('复制失败:', err);
-            showToast('复制失败', 'error');
-        });
+        } else {
+            showToast('复制失败，请手动复制', 'error');
+        }
     } else {
         showToast('没有可复制的提示词', 'error');
     }

@@ -8,6 +8,34 @@ let currentImages = []; // 当前目录下的图片列表
 let currentPreviewIndex = -1; // 当前预览的图片索引
 let currentPromptInfo = null; // 当前图片的 prompt 信息
 let isInfoPopupOpen = false; // 信息弹窗是否打开
+let isFolderSectionCollapsed = false; // 目录区域是否收起
+
+/**
+ * 切换目录区域的展开/收起状态
+ */
+function toggleFolderSection() {
+    const folderGrid = document.getElementById('folderGrid');
+    const folderEmptyState = document.getElementById('folderEmptyState');
+    const toggleIcon = document.getElementById('folderToggleIcon');
+    
+    isFolderSectionCollapsed = !isFolderSectionCollapsed;
+    
+    if (isFolderSectionCollapsed) {
+        // 收起
+        folderGrid.classList.add('hidden');
+        folderEmptyState.classList.add('hidden');
+        toggleIcon.style.transform = 'rotate(-90deg)';
+    } else {
+        // 展开
+        folderGrid.classList.remove('hidden');
+        // 只有在有目录时才显示空状态
+        const folderCount = document.getElementById('folderCount').textContent;
+        if (folderCount === '0 个目录' || folderCount === '加载中...') {
+            folderEmptyState.classList.remove('hidden');
+        }
+        toggleIcon.style.transform = 'rotate(0deg)';
+    }
+}
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -70,18 +98,20 @@ function renderStructure(structure) {
     
     folderEmptyState.classList.add('hidden');
     
-    // 渲染目录卡片
-    folderGrid.innerHTML = folders.map(folder => `
-        <div class="folder-card cursor-pointer rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 text-center card-hover"
-             onclick="navigateToFolder('${folder.path}')">
-            <div class="w-16 h-16 mx-auto mb-3 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                </svg>
-            </div>
-            <p class="text-sm font-medium text-slate-700 dark:text-slate-300 truncate" title="${folder.name}">${folder.name}</p>
+    // 渲染目录列表 - 响应式网格布局
+    folderGrid.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+            ${folders.map(folder => `
+                <div class="folder-chip cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-200 dark:hover:border-primary-800 transition-all duration-200 group"
+                     onclick="navigateToFolder('${folder.path}')">
+                    <svg class="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300 truncate" title="${folder.name}">${folder.name}</span>
+                </div>
+            `).join('')}
         </div>
-    `).join('');
+    `;
 }
 
 
@@ -532,16 +562,53 @@ function showEmptyPopupInfo() {
 }
 
 /**
+ * 复制文本到剪贴板（兼容移动端）
+ * @param {string} text - 要复制的文本
+ * @returns {Promise<boolean>} 是否复制成功
+ */
+async function copyToClipboard(text) {
+    if (!text) return false;
+
+    // 尝试使用现代 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (err) {
+            console.log('Clipboard API 失败，尝试降级方案:', err);
+        }
+    }
+
+    // 降级方案：使用 execCommand
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        return successful;
+    } catch (err) {
+        console.error('execCommand 复制失败:', err);
+        return false;
+    }
+}
+
+/**
  * 从弹窗复制提示词
  */
-function copyPromptFromPopup() {
+async function copyPromptFromPopup() {
     if (currentPromptInfo && currentPromptInfo.prompt) {
-        navigator.clipboard.writeText(currentPromptInfo.prompt).then(() => {
+        const success = await copyToClipboard(currentPromptInfo.prompt);
+        if (success) {
             showToast('提示词已复制');
-        }).catch(err => {
-            console.error('复制失败:', err);
-            showToast('复制失败', 'error');
-        });
+        } else {
+            showToast('复制失败，请手动复制', 'error');
+        }
     } else {
         showToast('没有可复制的提示词', 'error');
     }
