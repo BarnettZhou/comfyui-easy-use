@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadStructure(dirPath = '') {
     try {
         showLoading(true);
-        const url = dirPath ? `/api/easy-use/structure/${dirPath}` : '/api/easy-use/structure';
+        const url = dirPath ? `/api/easy-use/structure/${dirPath}` : '/api/easy-use/structure/';
         const response = await fetch(url);
         if (!response.ok) throw new Error('获取目录结构失败');
         
