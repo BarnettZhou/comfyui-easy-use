@@ -1,5 +1,8 @@
 {
     "port": 8000,
+    "_comment_comfyui": "ComfyUI服务器配置（可选）。若不配置，默认使用浏览器当前访问的地址",
+    "comfyui_host": "192.168.31.153",
+    "comfyui_port": 8188,
     "diffusion_models": [
         {
             "value": "z_image_turbo_bf16.safetensors",

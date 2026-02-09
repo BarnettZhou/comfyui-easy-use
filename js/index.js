@@ -98,7 +98,7 @@ async function initConsole() {
 
 // 初始化 WebSocket 监听执行进度
 function setupWebSocket() {
-    const wsUrl = SERVER.replace('http', 'ws') + '/ws?clientId=easy_gen_client';
+    const wsUrl = COMFYUI_SERVER.replace('http', 'ws') + '/ws?clientId=easy_gen_client';
     socket = new WebSocket(wsUrl);
 
     socket.onmessage = (event) => {
@@ -364,7 +364,7 @@ async function queuePrompt() {
             if (shouldStop) break; 
             btn.innerText = `Running ${i + 1}/${batchCount}`;
 
-            const res = await fetch(`${SERVER}/prompt`, {
+            const res = await fetch(`${COMFYUI_SERVER}/prompt`, {
                 method: 'POST',
                 body: JSON.stringify({ prompt: p })
             });
@@ -397,7 +397,7 @@ function trackTask(id) {
     return new Promise((resolve) => {
         const timer = setInterval(async () => {
             try {
-                const res = await fetch(`${SERVER}/history/${id}`);
+                const res = await fetch(`${COMFYUI_SERVER}/history/${id}`);
                 const data = await res.json();
                 if(data[id]) {
                     clearInterval(timer);
@@ -432,21 +432,36 @@ function renderImg(outputs) {
 
     for (let nodeId of nodeIds) {
         outputs[nodeId].images.forEach(img => {
-            const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+            const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
             
             const wrapper = document.createElement('div');
             wrapper.className = 'relative group animate-fade-in';
-            wrapper.innerHTML = `
-                <div class="aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 img-skeleton">
-                    <img src="${url}" loading="lazy" onclick="openResultPreview('${url}')" 
-                        class="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                        onload="this.parentElement.classList.remove('img-skeleton')">
-                </div>
-                <span class="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm">
-                    ${nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图'}
-                </span>
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl"></div>
-            `;
+            
+            const imgWrapper = document.createElement('div');
+            imgWrapper.className = 'aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 img-skeleton cursor-pointer';
+            imgWrapper.onclick = () => openResultPreview(url);
+            
+            const imgEl = document.createElement('img');
+            imgEl.src = url;
+            imgEl.loading = 'lazy';
+            imgEl.className = 'w-full h-full object-cover hover:scale-105 transition-transform duration-300';
+            imgEl.onload = function() {
+                this.parentElement.classList.remove('img-skeleton');
+            };
+            
+            imgWrapper.appendChild(imgEl);
+            
+            const label = document.createElement('span');
+            label.className = 'absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm pointer-events-none';
+            label.textContent = nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl pointer-events-none';
+            
+            wrapper.appendChild(imgWrapper);
+            wrapper.appendChild(label);
+            wrapper.appendChild(overlay);
+            
             container.prepend(wrapper);
             imageCount++;
         });
@@ -459,7 +474,7 @@ function renderImg(outputs) {
 
 // ========== 历史记录 ==========
 async function loadHistory() {
-    const res = await fetch(`${SERVER}/history`);
+    const res = await fetch(`${COMFYUI_SERVER}/history`);
     const data = await res.json();
     const list = document.getElementById('historyList');
     const emptyState = document.getElementById('historyEmptyState');
@@ -471,7 +486,7 @@ async function loadHistory() {
         if (!item.outputs) return;
         for (let nid in item.outputs) {
             item.outputs[nid].images?.forEach(img => {
-                const url = `${SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+                const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
                 const imageKey = `${taskId}-${nid}-${img.filename}`;
                 
                 if (!displayedTaskIds.has(imageKey)) {
@@ -590,10 +605,10 @@ async function loadHistory() {
 async function interruptTask(type) {
     shouldStop = true;
     if(type === 'all') {
-        await fetch(`${SERVER}/queue`, { method: 'POST', body: JSON.stringify({clear: true}) });
+        await fetch(`${COMFYUI_SERVER}/queue`, { method: 'POST', body: JSON.stringify({clear: true}) });
         alert("已请求清空队列");
     } else {
-        await fetch(`${SERVER}/interrupt`, { method: 'POST' });
+        await fetch(`${COMFYUI_SERVER}/interrupt`, { method: 'POST' });
     }
 }
 
@@ -627,6 +642,9 @@ function closePreview() {
     }
 }
 
+// 当前预览的图片URL（用于生成结果预览）
+let currentResultPreviewUrl = null;
+
 // 预览生成结果图片（独立预览，不参与历史导航）
 function openResultPreview(url) {
     const preview = document.getElementById('fullPreview');
@@ -636,6 +654,7 @@ function openResultPreview(url) {
 
     // 显示预览但不设置当前索引，这样导航按钮将不会工作
     previewImg.src = url;
+    currentResultPreviewUrl = url;
     preview.classList.remove('hidden');
     // 禁用body滚动
     document.body.style.overflow = 'hidden';
@@ -696,7 +715,7 @@ async function clearHistory() {
     if (confirm('是否清空历史记录？')) {
         try {
             // 调用ComfyUI API清除历史记录
-            await fetch(`${SERVER}/history`, {
+            await fetch(`${COMFYUI_SERVER}/history`, {
                 method: 'POST',
                 body: JSON.stringify({clear: true})
             });
@@ -752,7 +771,7 @@ async function sendToConsole() {
 
     try {
         // 从服务器获取任务历史记录
-        const res = await fetch(`${SERVER}/history/${currentTaskId}`);
+        const res = await fetch(`${COMFYUI_SERVER}/history/${currentTaskId}`);
         const data = await res.json();
         const task = data[currentTaskId];
 
@@ -1201,16 +1220,53 @@ function showEmptyPopupInfo() {
 }
 
 /**
+ * 复制文本到剪贴板（兼容移动端）
+ * @param {string} text - 要复制的文本
+ * @returns {Promise<boolean>} 是否复制成功
+ */
+async function copyToClipboard(text) {
+    if (!text) return false;
+    
+    // 尝试使用现代 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (err) {
+            console.log('Clipboard API 失败，尝试降级方案:', err);
+        }
+    }
+    
+    // 降级方案：使用 execCommand
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        return successful;
+    } catch (err) {
+        console.error('execCommand 复制失败:', err);
+        return false;
+    }
+}
+
+/**
  * 从弹窗复制提示词
  */
-function copyPromptFromPopup() {
+async function copyPromptFromPopup() {
     if (currentPromptInfo && currentPromptInfo.prompt) {
-        navigator.clipboard.writeText(currentPromptInfo.prompt).then(() => {
+        const success = await copyToClipboard(currentPromptInfo.prompt);
+        if (success) {
             showToast('提示词已复制');
-        }).catch(err => {
-            console.error('复制失败:', err);
-            showToast('复制失败', 'error');
-        });
+        } else {
+            showToast('复制失败，请手动复制', 'error');
+        }
     } else {
         showToast('没有可复制的提示词', 'error');
     }
