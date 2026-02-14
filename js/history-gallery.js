@@ -1,14 +1,29 @@
 /**
  * 文件浏览器 - 浏览 easy-use 目录下的文件和文件夹
+ * 支持两种视图模式：目录浏览模式 / 无限浏览模式
  */
 
-// 全局状态
+// ==================== 全局状态 ====================
+
+// 目录浏览模式状态
 let currentPath = ''; // 当前目录路径（相对于 easy-use）
 let currentImages = []; // 当前目录下的图片列表
 let currentPreviewIndex = -1; // 当前预览的图片索引
 let currentPromptInfo = null; // 当前图片的 prompt 信息
 let isInfoPopupOpen = false; // 信息弹窗是否打开
 let isFolderSectionCollapsed = false; // 目录区域是否收起
+
+// 视图模式状态
+let currentViewMode = 'folder'; // 'folder' | 'infinite'
+
+// 无限浏览模式状态
+let infiniteImages = []; // 无限浏览的所有图片
+let infiniteOffset = 0; // 当前加载偏移量
+let infiniteLimit = 50; // 每次加载数量
+let isInfiniteLoading = false; // 是否正在加载
+let hasMoreInfiniteImages = true; // 是否还有更多图片
+let infiniteScrollObserver = null; // 无限滚动观察器
+let infiniteTotalCount = 0; // 图片总数
 
 /**
  * 切换目录区域的展开/收起状态
@@ -39,6 +54,9 @@ function toggleFolderSection() {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
+    // 初始化视图模式
+    initViewMode();
+    
     // 同时加载根目录的目录结构和图片
     Promise.all([
         loadStructure(),
@@ -52,6 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
             closePreview();
         }
     });
+    
+    // 初始化无限滚动
+    initInfiniteScroll();
 });
 
 /**
@@ -308,6 +329,14 @@ function renderImages(files) {
  * 刷新当前视图
  */
 async function refreshCurrentView() {
+    // 根据当前视图模式决定刷新哪个视图
+    if (currentViewMode === 'infinite') {
+        await refreshInfiniteView();
+        showToast('刷新成功');
+        return;
+    }
+    
+    // 目录浏览模式刷新
     if (currentPath) {
         await Promise.all([
             loadStructure(currentPath),
@@ -735,5 +764,318 @@ document.addEventListener('keydown', (e) => {
             // I 键切换信息弹窗
             toggleInfoPopup();
             break;
+        case 'v':
+        case 'V':
+            // V 键切换视图模式
+            toggleViewMode();
+            break;
     }
 });
+
+
+// ==================== 视图切换功能 ====================
+
+/**
+ * 初始化视图模式
+ */
+function initViewMode() {
+    const savedMode = localStorage.getItem('viewMode');
+    if (savedMode === 'infinite') {
+        currentViewMode = 'infinite';
+        // 页面加载时不自动切换，保持默认目录视图
+        // 用户点击按钮后才切换
+    }
+    updateViewToggleUI();
+}
+
+/**
+ * 切换视图模式
+ */
+function toggleViewMode() {
+    if (currentViewMode === 'folder') {
+        switchToInfiniteMode();
+    } else {
+        switchToFolderMode();
+    }
+}
+
+/**
+ * 切换到目录浏览模式
+ */
+function switchToFolderMode() {
+    currentViewMode = 'folder';
+    localStorage.setItem('viewMode', 'folder');
+    
+    // 隐藏无限浏览容器，显示目录浏览容器
+    document.getElementById('infiniteViewContainer').classList.add('hidden');
+    document.getElementById('folderViewContainer').classList.remove('hidden');
+    
+    // 恢复面包屑显示
+    document.getElementById('breadcrumbContainer').closest('div').classList.remove('hidden');
+    
+    updateViewToggleUI();
+    showToast('已切换到目录浏览模式');
+}
+
+/**
+ * 切换到无限浏览模式
+ */
+async function switchToInfiniteMode() {
+    currentViewMode = 'infinite';
+    localStorage.setItem('viewMode', 'infinite');
+    
+    // 隐藏目录浏览容器，显示无限浏览容器
+    document.getElementById('folderViewContainer').classList.add('hidden');
+    document.getElementById('infiniteViewContainer').classList.remove('hidden');
+    
+    // 隐藏面包屑（无限浏览不需要面包屑）
+    document.getElementById('breadcrumbContainer').closest('div').classList.add('hidden');
+    
+    updateViewToggleUI();
+    
+    // 如果还没有加载过数据，开始加载
+    if (infiniteImages.length === 0 && !isInfiniteLoading) {
+        await loadInfiniteImages();
+    }
+}
+
+/**
+ * 更新视图切换按钮的UI
+ */
+function updateViewToggleUI() {
+    const folderIcon = document.getElementById('folderViewIcon');
+    const infiniteIcon = document.getElementById('infiniteViewIcon');
+    const viewModeText = document.getElementById('viewModeText');
+    const viewToggleBtn = document.getElementById('viewToggleBtn');
+    
+    if (currentViewMode === 'folder') {
+        folderIcon.classList.remove('hidden');
+        infiniteIcon.classList.add('hidden');
+        viewModeText.textContent = '目录';
+        viewToggleBtn.title = '点击切换到无限浏览模式';
+    } else {
+        folderIcon.classList.add('hidden');
+        infiniteIcon.classList.remove('hidden');
+        viewModeText.textContent = '无限';
+        viewToggleBtn.title = '点击切换到目录浏览模式';
+    }
+}
+
+// ==================== 无限浏览模式 ====================
+
+/**
+ * 初始化无限滚动
+ */
+function initInfiniteScroll() {
+    const trigger = document.getElementById('infiniteScrollTrigger');
+    if (!trigger) return;
+    
+    infiniteScrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !isInfiniteLoading && hasMoreInfiniteImages && currentViewMode === 'infinite') {
+                loadInfiniteImages();
+            }
+        });
+    }, {
+        rootMargin: '100px' // 提前100px开始加载
+    });
+    
+    infiniteScrollObserver.observe(trigger);
+}
+
+/**
+ * 加载无限浏览图片
+ */
+async function loadInfiniteImages() {
+    if (isInfiniteLoading || !hasMoreInfiniteImages) return;
+    
+    isInfiniteLoading = true;
+    showInfiniteLoading(true);
+    
+    try {
+        const response = await fetch(`/api/infinite-images?limit=${infiniteLimit}&offset=${infiniteOffset}`);
+        if (!response.ok) throw new Error('获取图片列表失败');
+        
+        const data = await response.json();
+        const newImages = data.files || [];
+        
+        if (newImages.length > 0) {
+            // 格式化图片数据
+            const formattedImages = newImages.map(img => ({
+                name: img.name,
+                path: img.path,
+                fullPath: img.fullPath,
+                size: img.size,
+                mtime: img.mtime
+            }));
+            
+            infiniteImages.push(...formattedImages);
+            infiniteOffset += newImages.length;
+            hasMoreInfiniteImages = data.hasMore;
+            
+            // 渲染新加载的图片
+            renderInfiniteImages(formattedImages, infiniteOffset === newImages.length);
+            
+            // 更新总数
+            if (infiniteTotalCount === 0) {
+                updateInfiniteTotalCount();
+            }
+        } else {
+            hasMoreInfiniteImages = false;
+            showInfiniteEndMessage();
+        }
+        
+        // 如果是第一次加载且没有数据，显示空状态
+        if (infiniteOffset === 0 && newImages.length === 0) {
+            showInfiniteEmptyState();
+        }
+        
+    } catch (error) {
+        console.error('[无限浏览] 加载图片失败:', error);
+        showToast('加载图片失败', 'error');
+    } finally {
+        isInfiniteLoading = false;
+        showInfiniteLoading(false);
+    }
+}
+
+/**
+ * 渲染无限浏览图片
+ * @param {Array} images - 图片数组
+ * @param {boolean} isFirstBatch - 是否是第一批数据
+ */
+function renderInfiniteImages(images, isFirstBatch) {
+    const grid = document.getElementById('infiniteImageGrid');
+    const emptyState = document.getElementById('infiniteEmptyState');
+    
+    if (isFirstBatch) {
+        grid.innerHTML = '';
+        emptyState.classList.add('hidden');
+    }
+    
+    const html = images.map((file, index) => {
+        const actualIndex = infiniteOffset - images.length + index;
+        return `
+            <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer card-hover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 img-skeleton"
+                 onclick="openInfinitePreview(${actualIndex})">
+                <img data-src="${file.fullPath}" 
+                     alt="${file.name}"
+                     class="lazy-image w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                     loading="lazy"
+                     onload="this.parentElement.classList.remove('img-skeleton')"
+                     onerror="this.parentElement.classList.remove('img-skeleton'); this.parentElement.innerHTML='<div class=\'w-full h-full flex items-center justify-center text-slate-400\'><span class=\'text-xs\'>加载失败</span></div>'">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div class="absolute bottom-0 left-0 right-0 p-3">
+                        <p class="text-white text-xs truncate">${file.name}</p>
+                        <p class="text-white/70 text-xs">${formatFileSize(file.size)} · ${formatDate(file.mtime)}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    grid.insertAdjacentHTML('beforeend', html);
+    
+    // 为新添加的图片添加懒加载观察
+    const newImages = grid.querySelectorAll('.lazy-image:not([data-observed])');
+    newImages.forEach(img => {
+        img.setAttribute('data-observed', 'true');
+        if (imageLazyObserver) {
+            imageLazyObserver.observe(img);
+        }
+    });
+}
+
+/**
+ * 显示/隐藏加载动画
+ */
+function showInfiniteLoading(show) {
+    const trigger = document.getElementById('infiniteScrollTrigger');
+    if (show) {
+        trigger.classList.remove('hidden');
+    } else if (!hasMoreInfiniteImages) {
+        trigger.classList.add('hidden');
+    }
+}
+
+/**
+ * 显示空状态
+ */
+function showInfiniteEmptyState() {
+    document.getElementById('infiniteEmptyState').classList.remove('hidden');
+    document.getElementById('infiniteScrollTrigger').classList.add('hidden');
+    document.getElementById('infiniteEndMessage').classList.add('hidden');
+}
+
+/**
+ * 显示结束消息
+ */
+function showInfiniteEndMessage() {
+    document.getElementById('infiniteScrollTrigger').classList.add('hidden');
+    if (infiniteImages.length > 0) {
+        document.getElementById('infiniteEndMessage').classList.remove('hidden');
+    }
+}
+
+/**
+ * 更新图片总数显示
+ */
+async function updateInfiniteTotalCount() {
+    try {
+        const response = await fetch('/api/images-count');
+        if (!response.ok) throw new Error('获取数量失败');
+        
+        const data = await response.json();
+        infiniteTotalCount = data.count;
+        document.getElementById('infiniteTotalCount').textContent = `共 ${infiniteTotalCount} 张`;
+    } catch (error) {
+        console.error('[无限浏览] 获取总数失败:', error);
+        document.getElementById('infiniteTotalCount').textContent = '数量未知';
+    }
+}
+
+/**
+ * 打开无限浏览模式下的全屏预览
+ * @param {number} index - 图片索引
+ */
+function openInfinitePreview(index) {
+    currentPreviewIndex = index;
+    const preview = document.getElementById('fullPreview');
+    const img = document.getElementById('previewImg');
+    
+    // 使用无限浏览的图片列表
+    currentImages = infiniteImages;
+    
+    img.src = infiniteImages[index].fullPath;
+    preview.classList.remove('hidden');
+    
+    // 禁止背景滚动
+    document.body.style.overflow = 'hidden';
+    
+    // 更新导航按钮状态
+    updateNavButtons();
+    
+    // 预解析图片信息
+    preloadImageInfo(infiniteImages[index].fullPath);
+}
+
+/**
+ * 刷新无限浏览数据
+ */
+async function refreshInfiniteView() {
+    // 重置状态
+    infiniteImages = [];
+    infiniteOffset = 0;
+    hasMoreInfiniteImages = true;
+    infiniteTotalCount = 0;
+    
+    // 清空网格
+    document.getElementById('infiniteImageGrid').innerHTML = '';
+    document.getElementById('infiniteEndMessage').classList.add('hidden');
+    
+    // 重新加载
+    await loadInfiniteImages();
+    
+    // 触发后台扫描更新数据库
+    fetch('/api/scan-images', { method: 'POST' }).catch(() => {});
+}

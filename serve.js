@@ -2,6 +2,13 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { exec } = require('child_process');
+
+// 引入数据库模块
+const ImageDatabase = require('./db');
+
+// 数据库实例
+const db = new ImageDatabase();
 
 // 获取局域网IP地址
 function getLocalIP() {
@@ -32,9 +39,11 @@ function getLocalIP() {
 const PORT = 11451;
 const HOST = '0.0.0.0'; // 允许所有设备访问
 
+// easy-use 目录路径
+const EASY_USE_DIR = path.join(__dirname, '..', 'easy-use');
+
 // 检查config.json文件是否存在
 const configPath = path.join(__dirname, 'config.json');
-// const exampleConfigPath = path.join(__dirname, 'example-config.json');
 
 if (!fs.existsSync(configPath)) {
     console.log('\n错误：未找到config.json配置文件！');
@@ -50,21 +59,137 @@ if (!fs.existsSync(configPath)) {
 // 支持的MIME类型
 const mimeTypes = {
     '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
     '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
     '.ico': 'image/x-icon',
-    '.json': 'application/json'
+    '.json': 'application/json',
+    '.svg': 'image/svg+xml'
 };
+
+// ==================== 图片扫描功能 ====================
+
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+
+/**
+ * 检查文件是否为图片
+ */
+function isImageFile(filename) {
+    const ext = path.extname(filename).toLowerCase();
+    return IMAGE_EXTENSIONS.includes(ext);
+}
+
+/**
+ * 获取日期字符串
+ */
+function getDateString(date = new Date()) {
+    return date.toISOString().split('T')[0];
+}
+
+/**
+ * 扫描单个目录中的图片
+ */
+function scanDirectory(dirPath, relativePath = '') {
+    const images = [];
+    
+    try {
+        const items = fs.readdirSync(dirPath);
+        
+        for (const item of items) {
+            const fullPath = path.join(dirPath, item);
+            const itemRelativePath = relativePath ? path.join(relativePath, item) : item;
+            
+            const stat = fs.statSync(fullPath);
+            
+            if (stat.isDirectory()) {
+                const subImages = scanDirectory(fullPath, itemRelativePath);
+                images.push(...subImages);
+            } else if (stat.isFile() && isImageFile(item)) {
+                images.push({
+                    filename: item,
+                    path: itemRelativePath.replace(/\\/g, '/'),
+                    full_path: fullPath,
+                    size: stat.size,
+                    mtime: Math.floor(stat.mtime.getTime() / 1000)
+                });
+            }
+        }
+    } catch (error) {
+        console.error(`[扫描错误] ${dirPath}:`, error.message);
+    }
+    
+    return images;
+}
+
+/**
+ * 扫描指定日期目录
+ */
+function scanDateDirectory(dateStr) {
+    const dateDir = path.join(EASY_USE_DIR, dateStr);
+    
+    if (!fs.existsSync(dateDir)) {
+        return [];
+    }
+    
+    return scanDirectory(dateDir, dateStr);
+}
+
+/**
+ * 执行心跳扫描任务（扫描最近两天）
+ */
+function doHeartbeatScan() {
+    console.log('[心跳] 开始扫描最近两天的图片...');
+    
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const todayStr = getDateString(today);
+    const yesterdayStr = getDateString(yesterday);
+
+    let allImages = [];
+    
+    const todayImages = scanDateDirectory(todayStr);
+    allImages.push(...todayImages);
+    
+    const yesterdayImages = scanDateDirectory(yesterdayStr);
+    allImages.push(...yesterdayImages);
+
+    if (allImages.length > 0) {
+        const inserted = db.batchUpsertImages(allImages);
+        console.log(`[心跳] 扫描完成，新增/更新 ${inserted} 张图片`);
+    } else {
+        console.log('[心跳] 最近两天没有发现新图片');
+    }
+}
+
+// ==================== HTTP 服务器 ====================
 
 // 创建服务器
 const server = http.createServer((req, res) => {
     console.log(`${req.method} ${req.url}`);
+    
+    // 设置 CORS 头
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+    }
     
     // 路由映射
     const routes = {
         '/': '/pages/index.html',
         '/gallery': '/pages/gallery.html',
         '/history-gallery': '/pages/history-gallery.html',
-        '/api/local-ip': '/api/local-ip' // 添加IP获取接口
+        '/api/local-ip': '/api/local-ip'
     };
 
     // 处理API请求
@@ -73,29 +198,78 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ localIP: getLocalIP() }), 'utf-8');
         return;
     }
+
+    // ========== 无限浏览模式 API ==========
+    
+    // 获取无限浏览图片列表
+    if (req.url.startsWith('/api/infinite-images')) {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const limit = parseInt(url.searchParams.get('limit')) || 50;
+        const offset = parseInt(url.searchParams.get('offset')) || 0;
+        
+        db.getImages(limit, offset).then(images => {
+            // 转换路径格式供前端使用
+            const formattedImages = images.map(img => ({
+                name: img.filename,
+                path: img.path,
+                fullPath: `/api/easy-use/files/${img.path}`,
+                size: img.size,
+                mtime: new Date(img.mtime * 1000).toISOString()
+            }));
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+                files: formattedImages,
+                limit: limit,
+                offset: offset,
+                hasMore: images.length === limit
+            }), 'utf-8');
+        }).catch(error => {
+            console.error('[API] 获取无限浏览图片失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '获取图片列表失败' }), 'utf-8');
+        });
+        return;
+    }
+    
+    // 获取图片总数
+    if (req.url === '/api/images-count') {
+        db.getCount().then(count => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ count }), 'utf-8');
+        }).catch(error => {
+            console.error('[API] 获取图片数量失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '获取图片数量失败' }), 'utf-8');
+        });
+        return;
+    }
+    
+    // 触发手动扫描
+    if (req.url === '/api/scan-images' && req.method === 'POST') {
+        console.log('[API] 收到手动扫描请求');
+        
+        // 异步执行扫描（不阻塞响应）
+        setTimeout(() => {
+            doHeartbeatScan();
+        }, 0);
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ message: '扫描任务已启动' }), 'utf-8');
+        return;
+    }
+    
+    // ========== 原有 API ==========
     
     /**
      * 获取easy-use目录下的项目结构
      * GET /api/easy-use/structure/{dir}
      * 返回{dir}目录下的项目结构，支持递归查询
-     *
-     * @param {string} dirParam - 目录路径参数，可选
-     * @returns {Object} 包含目录结构的对象
-     * @example
-     * {
-     *   "structure": [
-     *     {
-     *       "name": "2026-01-11",
-     *       "type": "directory",
-     *       "path": "2026-01-11"
-     *     }
-     *   ]
-     * }
      */
-    if (req.url.startsWith('/api/easy-use/structure/')) {
+    if (req.url.startsWith('/api/easy-use/structure')) {
         try {
             // 提取目录路径
-            let dirParam = req.url.replace('/api/easy-use/structure/', '');
+            let dirParam = req.url.replace('/api/easy-use/structure', '').replace(/^\//, '');
             
             // 构建目标路径
             const basePath = path.join(__dirname, '..', 'easy-use');
@@ -154,21 +328,6 @@ const server = http.createServer((req, res) => {
     /**
      * 获取指定目录下的图片列表
      * GET /api/easy-use/images/{dirPath}
-     * 返回{dirPath}目录下的图片列表，支持递归查询
-     *
-     * @param {string} dirPath - 目录路径，可选
-     * @returns {Object} 包含图片信息的对象
-     * @example
-     * {
-     *   "files": [
-     *     {
-     *       "name": "image_0001.png",
-     *       "path": "2026-01-11/image_0001.png",
-     *       "size": 12345,
-     *       "mtime": "2026-01-11T00:00:00.000Z"
-     *     }
-     *   ]
-     * }
      */
     if (req.url.startsWith('/api/easy-use/images/')) {
         try {
@@ -200,7 +359,7 @@ const server = http.createServer((req, res) => {
                 if (stat.isFile() && ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(path.extname(item).toLowerCase())) {
                     files.push({
                         name: item,
-                        path: path.join(dirPath, item),
+                        path: path.join(dirPath, item).replace(/\\/g, '/'),
                         size: stat.size,
                         mtime: stat.mtime.toISOString()
                     });
@@ -222,8 +381,6 @@ const server = http.createServer((req, res) => {
 
     /**
      * 提供easy-use目录中的图片文件访问
-     * @param {string} filePath - 文件路径，相对于easy-use目录
-     * @returns {File} 图片文件内容
      */
     if (req.url.startsWith('/api/easy-use/files/')) {
         try {
@@ -295,10 +452,60 @@ const server = http.createServer((req, res) => {
     });
 });
 
+// ==================== 启动 ====================
+
+// 初始化数据库
+db.init();
+
 // 启动服务器
 server.listen(PORT, HOST, () => {
     const localIP = getLocalIP();
-    console.log(`Server running at http://${HOST}:${PORT}/`);
-    console.log('Local access: http://localhost:11451/');
-    console.log(`LAN access: http://${localIP}:11451/`);
+    console.log('='.repeat(60));
+    console.log('ZIT Easy Use Server 启动成功');
+    console.log('='.repeat(60));
+    console.log(`本地访问: http://localhost:${PORT}/`);
+    console.log(`局域网访问: http://${localIP}:${PORT}/`);
+    console.log('='.repeat(60));
+    
+    // 检查 easy-use 目录
+    if (!fs.existsSync(EASY_USE_DIR)) {
+        console.log(`[警告] easy-use 目录不存在: ${EASY_USE_DIR}`);
+        console.log('[提示] 将自动创建目录');
+        fs.mkdirSync(EASY_USE_DIR, { recursive: true });
+    }
+    
+    // 启动时执行一次全量扫描
+    console.log('[启动] 正在执行初始扫描...');
+    exec('node scan-images.js --recent', (error, stdout, stderr) => {
+        if (error) {
+            console.error('[启动扫描错误]', error);
+        } else {
+            console.log(stdout);
+        }
+    });
+    
+    // 设置定时心跳任务（每60秒扫描最近两天）
+    console.log('[心跳] 已启用定时扫描（每60秒）');
+    setInterval(() => {
+        doHeartbeatScan();
+    }, 60000);
+});
+
+// 优雅关闭
+process.on('SIGINT', () => {
+    console.log('\n[关闭] 正在关闭服务器...');
+    db.close();
+    server.close(() => {
+        console.log('[关闭] 服务器已关闭');
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n[关闭] 正在关闭服务器...');
+    db.close();
+    server.close(() => {
+        console.log('[关闭] 服务器已关闭');
+        process.exit(0);
+    });
 });
