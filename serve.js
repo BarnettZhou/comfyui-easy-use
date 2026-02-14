@@ -165,6 +165,45 @@ function doHeartbeatScan() {
     } else {
         console.log('[心跳] 最近两天没有发现新图片');
     }
+    
+    // 更新日期统计
+    updateDateStatsForScan([todayStr, yesterdayStr]);
+}
+
+/**
+ * 更新扫描日期的统计信息
+ * @param {Array} dateStrs - 日期字符串数组
+ */
+function updateDateStatsForScan(dateStrs) {
+    for (const dateStr of dateStrs) {
+        const dateDir = path.join(EASY_USE_DIR, dateStr);
+        if (!fs.existsSync(dateDir)) {
+            // 目录不存在，检查是否需要删除该日期的统计
+            db.updateDateStats(dateStr, 0);
+            continue;
+        }
+        
+        // 统计该日期目录下的图片数量
+        let count = 0;
+        try {
+            const items = fs.readdirSync(dateDir);
+            for (const item of items) {
+                const itemPath = path.join(dateDir, item);
+                const stat = fs.statSync(itemPath);
+                if (stat.isFile() && isImageFile(item)) {
+                    count++;
+                }
+            }
+        } catch (error) {
+            console.error(`[日期统计] 统计 ${dateStr} 失败:`, error.message);
+        }
+        
+        // 更新数据库
+        db.updateDateStats(dateStr, count);
+        if (count > 0) {
+            console.log(`[日期统计] ${dateStr}: ${count} 张图片`);
+        }
+    }
 }
 
 // ==================== HTTP 服务器 ====================
@@ -241,6 +280,41 @@ const server = http.createServer((req, res) => {
             console.error('[API] 获取图片数量失败:', error);
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: '获取图片数量失败' }), 'utf-8');
+        });
+        return;
+    }
+    
+    // 获取所有日期列表（用于日期导航）
+    if (req.url === '/api/dates') {
+        db.getDateStats().then(dates => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ dates }), 'utf-8');
+        }).catch(error => {
+            console.error('[API] 获取日期列表失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '获取日期列表失败' }), 'utf-8');
+        });
+        return;
+    }
+    
+    // 获取指定日期在图片列表中的偏移量
+    if (req.url.startsWith('/api/date-offset')) {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const date = url.searchParams.get('date');
+        
+        if (!date) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '缺少 date 参数' }), 'utf-8');
+            return;
+        }
+        
+        db.getDateOffset(date).then(offset => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ date, offset }), 'utf-8');
+        }).catch(error => {
+            console.error('[API] 获取日期偏移量失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '获取日期偏移量失败' }), 'utf-8');
         });
         return;
     }

@@ -10,7 +10,6 @@
     <meta name="apple-mobile-web-app-title" content="ZIT">
     <link rel="apple-touch-icon" href="../resources/icon.png">
     <link rel="icon" href="../resources/icon.png" type="image/png">
-    <link rel="manifest" href="../manifest.json">
     <title>ZIT-Easy-Use</title>
     <script src="../js/tailwind.js"></script>
     <script>
@@ -776,19 +775,5 @@
 
     <script src="../js/common.js"></script>
     <script src="../js/index.js"></script>
-    <script>
-        // 注册 Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('../service-worker.js')
-                    .then(function(registration) {
-                        console.log('Service Worker 注册成功:', registration.scope);
-                    })
-                    .catch(function(error) {
-                        console.log('Service Worker 注册失败:', error);
-                    });
-            });
-        }
-    </script>
 </body>
 </html>

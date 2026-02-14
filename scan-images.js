@@ -42,6 +42,38 @@ function isImageFile(filename) {
 }
 
 /**
+ * 从路径中提取日期
+ * @param {string} path - 图片路径
+ * @returns {string} 日期字符串
+ */
+function extractDateFromPath(path) {
+    if (!path) return '';
+    const match = path.match(/(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+}
+
+/**
+ * 按日期分组统计图片
+ * @param {Array} images - 图片数组
+ * @returns {Object} 日期统计 { '2026-02-14': 10, ... }
+ */
+function groupImagesByDate(images) {
+    const groups = {};
+    
+    for (const img of images) {
+        const date = extractDateFromPath(img.path);
+        if (!date) continue;
+        
+        if (!groups[date]) {
+            groups[date] = 0;
+        }
+        groups[date]++;
+    }
+    
+    return groups;
+}
+
+/**
  * 扫描单个目录中的图片
  * @param {string} dirPath - 目录绝对路径
  * @param {string} relativePath - 相对于 easy-use 的路径
@@ -168,6 +200,18 @@ async function main() {
             console.log('[数据库] 正在更新索引...');
             const inserted = db.batchUpsertImages(allImages);
             console.log(`[数据库] 已更新 ${inserted} 条记录`);
+            
+            // 更新日期统计
+            console.log('[数据库] 正在更新日期统计...');
+            const dateCounts = groupImagesByDate(allImages);
+            // 如果是近期扫描模式，只更新扫描的日期；全量扫描时重建所有日期统计
+            if (isRecentMode) {
+                db.batchUpdateDateStats(dateCounts);
+            } else {
+                // 全量扫描时，先清空再重建
+                await db.rebuildDateStatsFromImages();
+            }
+            console.log(`[数据库] 已更新 ${Object.keys(dateCounts).length} 个日期的统计`);
         }
 
         // 显示统计

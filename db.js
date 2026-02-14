@@ -60,12 +60,23 @@ class ImageDatabase {
                 CREATE INDEX IF NOT EXISTS idx_path ON images(path);
             `;
 
+            // 创建日期统计表（用于快速获取日期导航）
+            const createDateStatsSQL = `
+                CREATE TABLE IF NOT EXISTS date_stats (
+                    date TEXT PRIMARY KEY,
+                    count INTEGER DEFAULT 0,
+                    updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+                )
+            `;
+
             if (isBetterSQLite3) {
                 this.db.exec(createTableSQL);
                 this.db.exec(createIndexSQL);
+                this.db.exec(createDateStatsSQL);
             } else {
                 this.db.run(createTableSQL);
                 this.db.run(createIndexSQL);
+                this.db.run(createDateStatsSQL);
             }
 
             console.log('[DB] 数据库初始化成功');
@@ -393,6 +404,198 @@ class ImageDatabase {
                 });
             }
         });
+    }
+
+    // ==================== 日期统计表操作 ====================
+
+    /**
+     * 更新日期统计
+     * @param {string} date - 日期字符串，如 "2026-02-14"
+     * @param {number} count - 该日期的图片数量
+     */
+    updateDateStats(date, count) {
+        const sql = `
+            INSERT INTO date_stats (date, count, updated_at)
+            VALUES (?, ?, strftime('%s', 'now'))
+            ON CONFLICT(date) DO UPDATE SET
+                count = excluded.count,
+                updated_at = excluded.updated_at
+        `;
+        
+        if (isBetterSQLite3) {
+            try {
+                this.db.prepare(sql).run(date, count);
+                return true;
+            } catch (error) {
+                console.error('[DB] 更新日期统计失败:', error);
+                return false;
+            }
+        } else {
+            this.db.run(sql, [date, count], (err) => {
+                if (err) console.error('[DB] 更新日期统计失败:', err);
+            });
+            return true;
+        }
+    }
+
+    /**
+     * 批量更新日期统计
+     * @param {Object} dateCounts - { '2026-02-14': 10, '2026-02-13': 5 }
+     */
+    batchUpdateDateStats(dateCounts) {
+        const dates = Object.keys(dateCounts);
+        if (dates.length === 0) return;
+        
+        if (isBetterSQLite3) {
+            const insert = this.db.prepare(`
+                INSERT INTO date_stats (date, count, updated_at)
+                VALUES (?, ?, strftime('%s', 'now'))
+                ON CONFLICT(date) DO UPDATE SET
+                    count = excluded.count,
+                    updated_at = excluded.updated_at
+            `);
+            
+            const insertMany = this.db.transaction((items) => {
+                for (const [date, count] of items) {
+                    insert.run(date, count);
+                }
+            });
+            
+            try {
+                insertMany(Object.entries(dateCounts));
+            } catch (error) {
+                console.error('[DB] 批量更新日期统计失败:', error);
+            }
+        } else {
+            this.db.serialize(() => {
+                this.db.run('BEGIN TRANSACTION');
+                const stmt = this.db.prepare(`
+                    INSERT INTO date_stats (date, count, updated_at)
+                    VALUES (?, ?, strftime('%s', 'now'))
+                    ON CONFLICT(date) DO UPDATE SET
+                        count = excluded.count,
+                        updated_at = excluded.updated_at
+                `);
+                
+                for (const [date, count] of Object.entries(dateCounts)) {
+                    stmt.run([date, count]);
+                }
+                
+                stmt.finalize();
+                this.db.run('COMMIT');
+            });
+        }
+    }
+
+    /**
+     * 获取所有日期统计（按日期倒序）
+     * @returns {Array} 日期统计列表 [{ date: '2026-02-14', count: 10 }, ...]
+     */
+    getDateStats() {
+        return new Promise((resolve, reject) => {
+            const sql = `SELECT date, count FROM date_stats ORDER BY date DESC`;
+            
+            if (isBetterSQLite3) {
+                try {
+                    const rows = this.db.prepare(sql).all();
+                    resolve(rows);
+                } catch (error) {
+                    reject(error);
+                }
+            } else {
+                this.db.all(sql, [], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            }
+        });
+    }
+
+    /**
+     * 获取指定日期在图片列表中的偏移量（offset）
+     * @param {string} date - 日期字符串，如 "2026-02-14"
+     * @returns {number} 偏移量（该日期第一张图片的索引），如果不存在返回 -1
+     */
+    getDateOffset(date) {
+        return new Promise((resolve, reject) => {
+            // 查询该日期之前（更晚）的所有图片数量
+            // 因为图片按时间倒序，日期越大（越新）排在越前面
+            const sql = `
+                SELECT COUNT(*) as offset 
+                FROM images 
+                WHERE SUBSTR(path, 1, 10) > ?
+            `;
+            
+            if (isBetterSQLite3) {
+                try {
+                    const row = this.db.prepare(sql).get(date);
+                    resolve(row ? row.offset : 0);
+                } catch (error) {
+                    reject(error);
+                }
+            } else {
+                this.db.get(sql, [date], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row ? row.offset : 0);
+                });
+            }
+        });
+    }
+
+    /**
+     * 根据图片路径更新日期统计
+     * 从路径中提取日期并统计
+     */
+    async rebuildDateStatsFromImages() {
+        try {
+            // 从 images 表中按日期分组统计
+            const sql = `
+                SELECT 
+                    SUBSTR(path, 1, 10) as date,
+                    COUNT(*) as count
+                FROM images
+                WHERE path LIKE '____-__-__/%'
+                GROUP BY SUBSTR(path, 1, 10)
+                ORDER BY date DESC
+            `;
+            
+            let rows;
+            if (isBetterSQLite3) {
+                rows = this.db.prepare(sql).all();
+            } else {
+                rows = await new Promise((resolve, reject) => {
+                    this.db.all(sql, [], (err, result) => {
+                        if (err) reject(err);
+                        else resolve(result);
+                    });
+                });
+            }
+            
+            // 清空旧数据并插入新数据
+            if (isBetterSQLite3) {
+                this.db.exec('DELETE FROM date_stats');
+            } else {
+                await new Promise((resolve, reject) => {
+                    this.db.run('DELETE FROM date_stats', (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+            }
+            
+            // 批量插入新数据
+            const dateCounts = {};
+            for (const row of rows) {
+                dateCounts[row.date] = row.count;
+            }
+            this.batchUpdateDateStats(dateCounts);
+            
+            console.log(`[DB] 重建日期统计完成，共 ${rows.length} 个日期`);
+            return rows.length;
+        } catch (error) {
+            console.error('[DB] 重建日期统计失败:', error);
+            throw error;
+        }
     }
 }
 

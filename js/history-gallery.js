@@ -415,7 +415,17 @@ async function prevImage(event) {
  * @param {Event} event - 事件对象
  */
 async function nextImage(event) {
-    event.stopPropagation();
+    if (event) event.stopPropagation();
+    
+    // 如果当前是最后一张且在无限浏览模式下，尝试加载更多
+    if (currentPreviewIndex >= currentImages.length - 1) {
+        if (currentViewMode === 'infinite' && hasMoreInfiniteImages && !isInfiniteLoading) {
+            console.log('[预览] 到达当前队列末尾，加载更多图片...');
+            await loadInfiniteImages();
+            // 加载完成后，currentImages 引用会更新（infiniteImages 已添加新数据）
+        }
+    }
+    
     if (currentPreviewIndex < currentImages.length - 1) {
         currentPreviewIndex++;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
@@ -440,8 +450,19 @@ function updateNavButtons() {
     prevBtn.style.opacity = currentPreviewIndex === 0 ? '0.3' : '0.7';
     prevBtn.style.cursor = currentPreviewIndex === 0 ? 'not-allowed' : 'pointer';
     
-    nextBtn.style.opacity = currentPreviewIndex === currentImages.length - 1 ? '0.3' : '0.7';
-    nextBtn.style.cursor = currentPreviewIndex === currentImages.length - 1 ? 'not-allowed' : 'pointer';
+    // 下一张按钮状态
+    const isLastImage = currentPreviewIndex === currentImages.length - 1;
+    const canLoadMore = currentViewMode === 'infinite' && hasMoreInfiniteImages;
+    
+    if (isLastImage && canLoadMore) {
+        // 无限浏览模式下还有更多图片可加载，显示可点击状态
+        nextBtn.style.opacity = '0.7';
+        nextBtn.style.cursor = 'pointer';
+    } else {
+        // 普通状态或没有更多图片
+        nextBtn.style.opacity = isLastImage ? '0.3' : '0.7';
+        nextBtn.style.cursor = isLastImage ? 'not-allowed' : 'pointer';
+    }
 }
 
 /**
@@ -748,16 +769,8 @@ document.addEventListener('keydown', (e) => {
             }
             break;
         case 'ArrowRight':
-            if (currentPreviewIndex < currentImages.length - 1) {
-                currentPreviewIndex++;
-                document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
-                updateNavButtons();
-                preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
-                if (isInfoPopupOpen) {
-                    resetPopupInfo();
-                    parseImageInfo(currentImages[currentPreviewIndex].fullPath);
-                }
-            }
+            // 使用 nextImage 函数，支持自动加载更多
+            nextImage(null);
             break;
         case 'i':
         case 'I':
@@ -781,9 +794,20 @@ document.addEventListener('keydown', (e) => {
 function initViewMode() {
     const savedMode = localStorage.getItem('viewMode');
     if (savedMode === 'infinite') {
+        // 如果有保存的无限模式偏好，切换到无限模式
+        // 注意：这里不调用 switchToInfiniteMode 避免加载数据
+        // 只更新状态和UI，数据在用户实际需要时再加载
         currentViewMode = 'infinite';
-        // 页面加载时不自动切换，保持默认目录视图
-        // 用户点击按钮后才切换
+        
+        // 切换容器显示
+        document.getElementById('folderViewContainer').classList.add('hidden');
+        document.getElementById('infiniteViewContainer').classList.remove('hidden');
+        document.getElementById('breadcrumbContainer').closest('div').classList.add('hidden');
+        
+        // 加载无限浏览数据
+        if (infiniteImages.length === 0 && !isInfiniteLoading) {
+            loadInfiniteImages();
+        }
     }
     updateViewToggleUI();
 }
@@ -863,6 +887,9 @@ function updateViewToggleUI() {
 
 // ==================== 无限浏览模式 ====================
 
+// 日期分组数据
+let dateGroups = []; // [{ date: '2026-02-14', count: 10, startIndex: 0 }, ...]
+
 /**
  * 初始化无限滚动
  */
@@ -881,7 +908,357 @@ function initInfiniteScroll() {
     });
     
     infiniteScrollObserver.observe(trigger);
+    
+    // 初始化移动端日期导航弹窗的滑动手势
+    initMobileDateNavSwipe();
 }
+
+/**
+ * 初始化移动端日期导航弹窗的滑动手势
+ */
+function initMobileDateNavSwipe() {
+    const modal = document.getElementById('mobileDateNavModal');
+    if (!modal) return;
+    
+    const content = modal.querySelector('.absolute.bottom-0');
+    if (!content) return;
+    
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+    
+    content.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+        isDragging = true;
+        content.style.transition = 'none';
+    }, { passive: true });
+    
+    content.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+        
+        // 只允许向下滑动
+        if (deltaY > 0) {
+            content.style.transform = `translateY(${deltaY}px)`;
+        }
+    }, { passive: true });
+    
+    content.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        
+        const deltaY = currentY - startY;
+        content.style.transition = 'transform 0.3s ease';
+        
+        // 如果下滑超过 100px，关闭弹窗
+        if (deltaY > 100) {
+            closeMobileDateNav();
+            setTimeout(() => {
+                content.style.transform = '';
+            }, 300);
+        } else {
+            // 否则回弹
+            content.style.transform = '';
+        }
+        
+        startY = 0;
+        currentY = 0;
+    });
+}
+
+/**
+ * 从路径中提取日期
+ * @param {string} path - 图片路径，如 "2026-02-14/image_001.png"
+ * @returns {string} 日期字符串
+ */
+function extractDateFromPath(path) {
+    if (!path) return '';
+    // 路径格式: 2026-02-14/image_001.png
+    const match = path.match(/(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+}
+
+/**
+ * 从服务器加载日期列表
+ */
+async function loadDateNav() {
+    try {
+        const response = await fetch('/api/dates');
+        if (!response.ok) throw new Error('获取日期列表失败');
+        
+        const data = await response.json();
+        // 转换格式以兼容现有代码
+        dateGroups = (data.dates || []).map((item) => ({
+            date: item.date,
+            count: item.count,
+            startIndex: -1 // 初始值，后续通过 updateDateGroupStartIndices 计算
+        }));
+        
+        // 立即计算一次 startIndex（如果图片已加载）
+        updateDateGroupStartIndices();
+        
+        renderDateNav();
+    } catch (error) {
+        console.error('[日期导航] 加载日期列表失败:', error);
+    }
+}
+
+/**
+ * 更新日期分组的起始索引
+ * 根据已加载的图片列表计算每个日期对应的起始位置
+ */
+function updateDateGroupStartIndices() {
+    if (dateGroups.length === 0 || infiniteImages.length === 0) return;
+    
+    // 重置所有 startIndex
+    dateGroups.forEach(group => {
+        group.startIndex = -1;
+    });
+    
+    // 遍历所有已加载的图片，记录每个日期的第一个出现位置
+    for (let i = 0; i < infiniteImages.length; i++) {
+        const date = extractDateFromPath(infiniteImages[i].path);
+        if (!date) continue;
+        
+        const group = dateGroups.find(g => g.date === date);
+        if (group && group.startIndex === -1) {
+            group.startIndex = i;
+        }
+    }
+}
+
+/**
+ * 渲染日期导航
+ */
+function renderDateNav() {
+    const navContainer = document.getElementById('infiniteDateNav');
+    const mobileNavContainer = document.getElementById('mobileDateNav');
+    
+    if (dateGroups.length === 0) return;
+    
+    const html = dateGroups.map(group => `
+        <button onclick="jumpToDate('${group.date}'); closeMobileDateNav();" 
+                class="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group flex items-center justify-between">
+            <div class="flex flex-col">
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    ${formatDateForNav(group.date)}
+                </span>
+                <span class="text-xs text-slate-400 dark:text-slate-500">
+                    ${group.count} 张图片
+                </span>
+            </div>
+            <svg class="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+    `).join('');
+    
+    if (navContainer) navContainer.innerHTML = html;
+    if (mobileNavContainer) mobileNavContainer.innerHTML = html;
+}
+
+/**
+ * 打开移动端日期导航弹窗
+ */
+function openMobileDateNav() {
+    const modal = document.getElementById('mobileDateNavModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    }
+}
+
+/**
+ * 关闭移动端日期导航弹窗
+ */
+function closeMobileDateNav() {
+    const modal = document.getElementById('mobileDateNavModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = ''; // 恢复背景滚动
+    }
+}
+
+/**
+ * 格式化日期用于导航显示
+ * @param {string} dateStr - 日期字符串，如 "2026-02-14"
+ * @returns {string} 格式化后的日期
+ */
+function formatDateForNav(dateStr) {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // 判断是否是今天/昨天
+    if (dateStr === today.toISOString().split('T')[0]) {
+        return '今天';
+    } else if (dateStr === yesterday.toISOString().split('T')[0]) {
+        return '昨天';
+    }
+    
+    // 返回 "2月14日" 格式
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+/**
+ * 跳转到指定日期的图片
+ * @param {string} date - 日期字符串
+ */
+async function jumpToDate(date) {
+    const group = dateGroups.find(g => g.date === date);
+    if (!group) return;
+    
+    let targetIndex = group.startIndex;
+    
+    // 如果 startIndex 为 -1，说明该日期的图片还未加载
+    // 需要通过 API 获取该日期的偏移量
+    if (targetIndex === -1) {
+        console.log(`[跳转] 日期 ${date} 尚未加载，正在获取偏移量...`);
+        try {
+            const response = await fetch(`/api/date-offset?date=${date}`);
+            if (!response.ok) throw new Error('获取偏移量失败');
+            
+            const data = await response.json();
+            targetIndex = data.offset;
+            
+            // 更新 group 的 startIndex，避免下次重复请求
+            group.startIndex = targetIndex;
+            
+            console.log(`[跳转] 日期 ${date} 的偏移量为 ${targetIndex}`);
+        } catch (error) {
+            console.error('[跳转] 获取日期偏移量失败:', error);
+            showToast('跳转到日期失败', 'error');
+            return;
+        }
+    }
+    
+    const grid = document.getElementById('infiniteImageGrid');
+    
+    // 检查目标是否已经在当前加载的范围内
+    const currentStartOffset = infiniteOffset - infiniteImages.length; // 当前已加载的起始位置
+    const isInCurrentRange = targetIndex >= currentStartOffset && targetIndex < infiniteOffset;
+    
+    if (isInCurrentRange && grid.children[targetIndex - currentStartOffset]) {
+        // 元素已存在，直接滚动
+        const relativeIndex = targetIndex - currentStartOffset;
+        const targetElement = grid.children[relativeIndex];
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // 高亮效果
+        targetElement.classList.add('ring-2', 'ring-primary-500');
+        setTimeout(() => {
+            targetElement.classList.remove('ring-2', 'ring-primary-500');
+        }, 2000);
+    } else {
+        // 如果元素不在当前视图中，重新加载从目标位置开始
+        console.log(`[跳转] 重新加载从索引 ${targetIndex} 开始...`);
+        const relativeIndex = await loadUntilIndex(targetIndex);
+        
+        const element = grid.children[relativeIndex];
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            element.classList.add('ring-2', 'ring-primary-500');
+            setTimeout(() => {
+                element.classList.remove('ring-2', 'ring-primary-500');
+            }, 2000);
+            showToast(`已跳转到 ${date}`, 'success');
+        } else {
+            console.error('[跳转] 加载后仍未找到目标元素');
+            showToast('跳转到日期失败', 'error');
+        }
+    }
+}
+
+/**
+ * 加载图片直到指定索引
+ * @param {number} targetIndex - 目标索引（相对于整个列表）
+ * @returns {number} 目标元素在新列表中的索引（通常是 0）
+ */
+async function loadUntilIndex(targetIndex) {
+    // 计算应该从哪个 offset 开始加载
+    // 让目标图片出现在第一页，方便用户看到
+    const startOffset = targetIndex;
+    
+    console.log(`[加载] 重置加载，目标索引: ${targetIndex}, 起始偏移: ${startOffset}`);
+    
+    // 清空当前列表，重新从 startOffset 加载
+    infiniteImages = [];
+    infiniteOffset = startOffset;
+    hasMoreInfiniteImages = true;
+    document.getElementById('infiniteImageGrid').innerHTML = '';
+    
+    // 加载一批图片（默认 limit 数量）
+    // 这样目标图片会是列表中的第一个（索引 0）
+    await loadInfiniteImages();
+    
+    // 如果还有更多，再加载一批确保有足够内容
+    if (hasMoreInfiniteImages && infiniteImages.length < infiniteLimit) {
+        await loadInfiniteImages();
+    }
+    
+    // 更新日期起始索引
+    updateDateGroupStartIndices();
+    
+    // 返回目标元素在新列表中的索引（总是 0，因为我们从目标位置开始加载）
+    return 0;
+}
+
+/**
+ * 回到顶部
+ */
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/**
+ * 更新当前激活的日期导航项
+ * 根据滚动位置自动高亮对应的日期
+ */
+function updateActiveDateNav() {
+    if (dateGroups.length === 0 || currentViewMode !== 'infinite') return;
+    
+    const scrollTop = window.scrollY;
+    const grid = document.getElementById('infiniteImageGrid');
+    if (!grid) return;
+    
+    // 找到当前在视口中的图片
+    const images = grid.querySelectorAll('.group');
+    let activeDate = null;
+    
+    for (let i = 0; i < images.length; i++) {
+        const rect = images[i].getBoundingClientRect();
+        if (rect.top >= 100 && rect.top <= window.innerHeight / 2) {
+            // 找到对应的日期
+            const group = dateGroups.find(g => i >= g.startIndex && i < g.startIndex + g.count);
+            if (group) {
+                activeDate = group.date;
+                break;
+            }
+        }
+    }
+    
+    // 更新导航高亮
+    if (activeDate) {
+        document.querySelectorAll('#infiniteDateNav button').forEach(btn => {
+            btn.classList.remove('date-nav-active');
+            if (btn.getAttribute('onclick').includes(`'${activeDate}'`)) {
+                btn.classList.add('date-nav-active');
+            }
+        });
+    }
+}
+
+// 添加滚动监听（使用节流）
+let scrollThrottleTimer = null;
+window.addEventListener('scroll', () => {
+    if (scrollThrottleTimer) return;
+    scrollThrottleTimer = setTimeout(() => {
+        updateActiveDateNav();
+        scrollThrottleTimer = null;
+    }, 200);
+});
 
 /**
  * 加载无限浏览图片
@@ -916,10 +1293,18 @@ async function loadInfiniteImages() {
             // 渲染新加载的图片
             renderInfiniteImages(formattedImages, infiniteOffset === newImages.length);
             
+            // 首次加载时获取日期导航
+            if (infiniteOffset === newImages.length) {
+                loadDateNav();
+            }
+            
             // 更新总数
             if (infiniteTotalCount === 0) {
                 updateInfiniteTotalCount();
             }
+            
+            // 更新日期的 startIndex（用于跳转）
+            updateDateGroupStartIndices();
         } else {
             hasMoreInfiniteImages = false;
             showInfiniteEndMessage();
@@ -951,13 +1336,16 @@ function renderInfiniteImages(images, isFirstBatch) {
     if (isFirstBatch) {
         grid.innerHTML = '';
         emptyState.classList.add('hidden');
+        // 第一批数据时初始化懒加载观察器
+        initImageLazyObserver();
     }
     
     const html = images.map((file, index) => {
-        const actualIndex = infiniteOffset - images.length + index;
+        // 使用在 infiniteImages 数组中的相对索引
+        const relativeIndex = infiniteImages.length - images.length + index;
         return `
             <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer card-hover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 img-skeleton"
-                 onclick="openInfinitePreview(${actualIndex})">
+                 onclick="openInfinitePreview(${relativeIndex})">
                 <img data-src="${file.fullPath}" 
                      alt="${file.name}"
                      class="lazy-image w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -1039,6 +1427,12 @@ async function updateInfiniteTotalCount() {
  * @param {number} index - 图片索引
  */
 function openInfinitePreview(index) {
+    // 安全检查
+    if (index < 0 || index >= infiniteImages.length) {
+        console.error(`[预览] 索引 ${index} 超出范围 (0-${infiniteImages.length - 1})`);
+        return;
+    }
+    
     currentPreviewIndex = index;
     const preview = document.getElementById('fullPreview');
     const img = document.getElementById('previewImg');
@@ -1068,9 +1462,11 @@ async function refreshInfiniteView() {
     infiniteOffset = 0;
     hasMoreInfiniteImages = true;
     infiniteTotalCount = 0;
+    dateGroups = [];
     
-    // 清空网格
+    // 清空网格和导航
     document.getElementById('infiniteImageGrid').innerHTML = '';
+    document.getElementById('infiniteDateNav').innerHTML = '';
     document.getElementById('infiniteEndMessage').classList.add('hidden');
     
     // 重新加载
