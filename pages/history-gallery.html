@@ -606,7 +606,7 @@
                 
                 <!-- 信息内容 -->
                 <div id="popupInfoContent" class="hidden space-y-4">
-                    <!-- 基础信息网格 -->
+                    <!-- 基础信息网格 - 第一行: 尺寸、采样器、调度器、步数 -->
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">尺寸</p>
@@ -617,26 +617,30 @@
                             <p id="popupInfoSampler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
                         </div>
                         <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">调度器</p>
+                            <p id="popupInfoScheduler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">步数</p>
                             <p id="popupInfoSteps" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
                         </div>
+                    </div>
+                    
+                    <!-- 更多详情 - 第二行: CFG、VAE、模型、种子 -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">CFG</p>
                             <p id="popupInfoCfg" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
                         </div>
-                    </div>
-                    
-                    <!-- 更多详情 -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">调度器</p>
-                            <p id="popupInfoScheduler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">VAE</p>
+                            <p id="popupInfoVae" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
                         </div>
-                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">模型</p>
                             <p id="popupInfoModel" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
                         </div>
-                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">种子</p>
                             <p id="popupInfoSeed" class="text-slate-800 dark:text-slate-200 text-sm font-mono truncate" title="">-</p>
                         </div>

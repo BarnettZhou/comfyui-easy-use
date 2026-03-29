@@ -506,12 +506,14 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoEmpty').classList.add('hidden');
     
     document.getElementById('popupInfoSize').textContent = info.size;
-    document.getElementById('popupInfoModel').textContent = info.model;
-    document.getElementById('popupInfoModel').title = info.model;
     document.getElementById('popupInfoSampler').textContent = info.sampler;
     document.getElementById('popupInfoScheduler').textContent = info.scheduler;
     document.getElementById('popupInfoSteps').textContent = info.steps;
     document.getElementById('popupInfoCfg').textContent = info.cfg;
+    document.getElementById('popupInfoVae').textContent = info.vae;
+    document.getElementById('popupInfoVae').title = info.vae;
+    document.getElementById('popupInfoModel').textContent = info.model;
+    document.getElementById('popupInfoModel').title = info.model;
     document.getElementById('popupInfoSeed').textContent = info.seed;
     document.getElementById('popupInfoSeed').title = info.seed;
     document.getElementById('popupInfoPrompt').textContent = info.prompt || '无提示词';

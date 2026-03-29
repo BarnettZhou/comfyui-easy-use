@@ -51,6 +51,7 @@ function extractPromptDataFromPromptText(prompt_text) {
     let steps = prompt['3']?.inputs?.steps || '-';
     let cfgScale = prompt['3']?.inputs?.cfg || '-';
     let seed = prompt['3']?.inputs?.seed || '-';
+    let vaeName = prompt['32']?.inputs?.vae_name || '-';
     let promptText = prompt['6']?.inputs?.text || '';
 
     // 如果 width/height 为空，尝试从原始文本中正则提取
@@ -110,6 +111,14 @@ function extractPromptDataFromPromptText(prompt_text) {
         }
     }
 
+    // 如果 vaeName 为空，尝试从 VAELoader 节点中提取
+    if (vaeName === '-') {
+        const match = prompt_text.match(/"vae_name":\s*"([^"]+)"/);
+        if (match) {
+            vaeName = match[1];
+        }
+    }
+
     // 如果 promptText 为空，尝试从 CLIPTextEncode 节点中提取
     if (!promptText || promptText === '') {
         const match = prompt_text.match(/"text":\s*"([^"]+)"/);
@@ -128,6 +137,7 @@ function extractPromptDataFromPromptText(prompt_text) {
         scheduler: scheduler,
         steps: steps,
         cfg: cfgScale,
+        vae: vaeName,
         seed: seed,
         prompt: promptText
     };
