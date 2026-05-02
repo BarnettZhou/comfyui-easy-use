@@ -510,9 +510,22 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoScheduler').textContent = info.scheduler;
     document.getElementById('popupInfoSteps').textContent = info.steps;
     document.getElementById('popupInfoCfg').textContent = info.cfg;
-    document.getElementById('popupInfoVae').textContent = info.vae;
+    // VAE名称映射
+    let displayVae = info.vae;
+    if (config && config.vae_models && info.vae && info.vae !== '-') {
+        const vaeItem = config.vae_models.find(v => v.value === info.vae);
+        if (vaeItem) displayVae = vaeItem.text;
+    }
+    document.getElementById('popupInfoVae').textContent = displayVae;
     document.getElementById('popupInfoVae').title = info.vae;
-    document.getElementById('popupInfoModel').textContent = info.model;
+
+    // 模型名称映射
+    let displayModel = info.model;
+    if (config && config.diffusion_models && info.model && info.model !== '-') {
+        const modelItem = config.diffusion_models.find(m => m.value === info.model);
+        if (modelItem) displayModel = modelItem.text;
+    }
+    document.getElementById('popupInfoModel').textContent = displayModel;
     document.getElementById('popupInfoModel').title = info.model;
     document.getElementById('popupInfoSeed').textContent = info.seed;
     document.getElementById('popupInfoSeed').title = info.seed;

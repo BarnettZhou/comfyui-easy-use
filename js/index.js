@@ -763,6 +763,185 @@ function openInNewTab() {
 }
 
 // 发送到控制台功能
+/**
+ * 根据 promptData 填充控制台表单
+ * @param {Object} promptData - ComfyUI 工作流数据
+ */
+async function fillFormFromPromptData(promptData) {
+    // 提示词
+    if (promptData["6"] && promptData["6"].inputs.text) {
+        document.getElementById('promptText').value = promptData["6"].inputs.text;
+    }
+
+    // 模型和VAE
+    if (promptData["34"] && promptData["34"].inputs.unet_name) {
+        const unetName = promptData["34"].inputs.unet_name;
+        const modelOption = config.diffusion_models.find(opt => opt.value === unetName);
+        if (modelOption) {
+            document.getElementById('modelSelect').value = modelOption.value;
+        }
+    }
+
+    if (promptData["32"] && promptData["32"].inputs.vae_name) {
+        const vaeOption = config.vae_models.find(opt => opt.value === promptData["32"].inputs.vae_name);
+        if (vaeOption) {
+            document.getElementById('vaeSelect').value = vaeOption.value;
+        }
+    }
+
+    // CFG
+    if (promptData["3"] && promptData["3"].inputs.cfg) {
+        document.getElementById('cfgInput').value = promptData["3"].inputs.cfg;
+    }
+
+    // 步数
+    if (promptData["3"] && promptData["3"].inputs.steps) {
+        document.getElementById('stepsInput').value = promptData["3"].inputs.steps;
+        document.getElementById('stepsValue').textContent = promptData["3"].inputs.steps;
+    }
+
+    // 图片尺寸
+    if (promptData["5"] && promptData["5"].inputs.width && promptData["5"].inputs.height) {
+        const imgWidth = promptData["5"].inputs.width;
+        const imgHeight = promptData["5"].inputs.height;
+        const sizeValue = `${imgWidth},${imgHeight}`;
+        
+        let foundRatio = null;
+        let foundSize = null;
+        
+        const sizeMap = await getSizeMap();
+
+        Object.keys(sizeMap).forEach(ratio => {
+            sizeMap[ratio].forEach(size => {
+                if (size.value === sizeValue) {
+                    foundRatio = ratio;
+                    foundSize = size.value;
+                }
+            });
+        });
+        
+        if (foundRatio) {
+            document.getElementById('ratioSelect').value = foundRatio;
+            updateSizeOptions();
+            document.getElementById('sizeSelect').value = foundSize;
+        } else {
+            document.getElementById('ratioSelect').value = 'custom';
+            updateSizeOptions();
+            document.getElementById('widthInput').value = imgWidth;
+            document.getElementById('heightInput').value = imgHeight;
+        }
+        
+        updateResHint();
+    }
+
+    // 采样器组合
+    if (promptData["3"] && promptData["3"].inputs.sampler_name && promptData["3"].inputs.scheduler) {
+        const samplerValue = `${promptData["3"].inputs.sampler_name},${promptData["3"].inputs.scheduler}`;
+        document.getElementById('samplerSelect').value = samplerValue;
+    }
+
+    // 图片放大设置
+    if (promptData["38"] && promptData["38"].inputs.scale_by) {
+        document.getElementById('upscaleEnable').checked = true;
+        document.getElementById('upscaleScale').value = promptData["38"].inputs.scale_by;
+        updateResHint();
+    } else {
+        document.getElementById('upscaleEnable').checked = false;
+    }
+
+    if (promptData["44"]) {
+        document.getElementById('loraEnable').checked = true;
+        document.getElementById('loraModel').value = promptData["44"].inputs.lora_name;
+        document.getElementById('loraStrength').value = promptData["44"].inputs.strength_model;
+    } else {
+        document.getElementById('loraEnable').checked = false;
+    }
+
+    // Denoise参数
+    if (promptData["40"] && promptData["40"].inputs.denoise) {
+        document.getElementById('denoiseValue').value = promptData["40"].inputs.denoise;
+    }
+
+    // 文件名前缀
+    if (promptData["9"] && promptData["9"].inputs.filename_prefix) {
+        let prefix_parts = promptData["9"].inputs.filename_prefix.split('/');
+        prefix_parts.shift();
+        document.getElementById('filePrefix').value = prefix_parts.join('/');
+    }
+
+    if (promptData["42"] && promptData["42"].inputs.filename_prefix) {
+        let prefix_parts = promptData["42"].inputs.filename_prefix.split('/');
+        prefix_parts.shift();
+        document.getElementById('filePrefix').value = prefix_parts.join('/');
+    }
+}
+
+/**
+ * 验证是否为合法的 ComfyUI 工作流
+ * @param {Object} data - 解析后的 JSON 对象
+ * @returns {boolean}
+ */
+function isValidComfyUIWorkflow(data) {
+    if (!data || typeof data !== 'object') return false;
+    // 检查是否包含 ComfyUI 典型的节点结构
+    const keys = Object.keys(data);
+    if (keys.length === 0) return false;
+    // 至少有一个节点包含 inputs 和 class_type
+    return keys.some(key => {
+        const node = data[key];
+        return node && typeof node === 'object' && node.inputs !== undefined && node.class_type !== undefined;
+    });
+}
+
+/**
+ * 从剪贴板导入 ComfyUI 工作流
+ */
+async function importFromClipboard() {
+    try {
+        let text = '';
+        
+        // 尝试读取剪贴板
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                text = await navigator.clipboard.readText();
+            } catch (err) {
+                showToast('无法读取剪贴板，请确保已授权', 'error');
+                return;
+            }
+        } else {
+            showToast('当前环境不支持读取剪贴板', 'error');
+            return;
+        }
+        
+        if (!text.trim()) {
+            showToast('剪贴板为空', 'error');
+            return;
+        }
+        
+        // 解析 JSON
+        let promptData;
+        try {
+            promptData = JSON.parse(text);
+        } catch (e) {
+            showToast('剪贴板内容不是有效的 JSON', 'error');
+            return;
+        }
+        
+        // 验证是否为 ComfyUI 工作流
+        if (!isValidComfyUIWorkflow(promptData)) {
+            showToast('剪贴板内容不是合法的 ComfyUI 工作流', 'error');
+            return;
+        }
+        
+        // 填充表单
+        await fillFormFromPromptData(promptData);
+        showToast('工作流已导入');
+    } catch (error) {
+        console.error('导入工作流失败:', error);
+        showToast('导入失败，请重试', 'error');
+    }
+}
+
 async function sendToConsole() {
     if (!currentTaskId) {
         showToast('无法获取任务参数，请确保从历史记录中选择图片');
@@ -781,120 +960,7 @@ async function sendToConsole() {
         }
 
         const promptData = task.prompt[2];
-
-        // 填充表单参数
-        // 提示词
-        if (promptData["6"] && promptData["6"].inputs.text) {
-            document.getElementById('promptText').value = promptData["6"].inputs.text;
-        }
-
-        // 模型和VAE
-        if (promptData["34"] && promptData["34"].inputs.unet_name) {
-            const unetName = promptData["34"].inputs.unet_name;
-            // 查找模型名称对应的显示文本
-            const modelOption = config.diffusion_models.find(opt => opt.value === unetName);
-            if (modelOption) {
-                document.getElementById('modelSelect').value = modelOption.value;
-            }
-        }
-
-        if (promptData["32"] && promptData["32"].inputs.vae_name) {
-            // 查找VAE名称对应的显示文本
-            const vaeOption = config.vae_models.find(opt => opt.value === promptData["32"].inputs.vae_name);
-            if (vaeOption) {
-                document.getElementById('vaeSelect').value = vaeOption.value;
-            }
-        }
-
-        // CFG
-        if (promptData["3"] && promptData["3"].inputs.cfg) {
-            document.getElementById('cfgInput').value = promptData["3"].inputs.cfg;
-        }
-
-        // 步数
-        if (promptData["3"] && promptData["3"].inputs.steps) {
-            document.getElementById('stepsInput').value = promptData["3"].inputs.steps;
-        }
-
-        // 图片尺寸
-        if (promptData["5"] && promptData["5"].inputs.width && promptData["5"].inputs.height) {
-            const imgWidth = promptData["5"].inputs.width;
-            const imgHeight = promptData["5"].inputs.height;
-            const sizeValue = `${imgWidth},${imgHeight}`;
-            
-            // 检查是否在预设sizeMap中
-            let foundRatio = null;
-            let foundSize = null;
-            
-            // 获取尺寸映射
-            const sizeMap = await getSizeMap();
-
-            // 遍历sizeMap查找匹配的尺寸
-            Object.keys(sizeMap).forEach(ratio => {
-                sizeMap[ratio].forEach(size => {
-                    if (size.value === sizeValue) {
-                        foundRatio = ratio;
-                        foundSize = size.value;
-                    }
-                });
-            });
-            
-            if (foundRatio) {
-                // 尺寸在预设中：设置对应的比例和尺寸
-                document.getElementById('ratioSelect').value = foundRatio;
-                updateSizeOptions(); // 更新尺寸下拉框
-                document.getElementById('sizeSelect').value = foundSize;
-            } else {
-                // 尺寸不在预设中：使用自定义大小
-                document.getElementById('ratioSelect').value = 'custom';
-                updateSizeOptions(); // 显示自定义输入框
-                document.getElementById('widthInput').value = imgWidth;
-                document.getElementById('heightInput').value = imgHeight;
-            }
-            
-            updateResHint(); // 更新目标分辨率提示
-        }
-
-        // 采样器组合
-        if (promptData["3"] && promptData["3"].inputs.sampler_name && promptData["3"].inputs.scheduler) {
-            const samplerValue = `${promptData["3"].inputs.sampler_name},${promptData["3"].inputs.scheduler}`;
-            document.getElementById('samplerSelect').value = samplerValue;
-        }
-
-        // 图片放大设置
-        if (promptData["38"] && promptData["38"].inputs.scale_by) {
-            document.getElementById('upscaleEnable').checked = true;
-            document.getElementById('upscaleScale').value = promptData["38"].inputs.scale_by;
-            updateResHint(); // 更新目标分辨率提示
-        } else {
-            document.getElementById('upscaleEnable').checked = false;
-        }
-
-        if (promptData["44"]) {
-            document.getElementById('loraEnable').checked = true;
-            document.getElementById('loraModel').value = promptData["44"].inputs.lora_name;
-            document.getElementById('loraStrength').value = promptData["44"].inputs.strength_model;
-        } else {
-            document.getElementById('loraEnable').checked = false;
-        }
-
-        // Denoise参数
-        if (promptData["40"] && promptData["40"].inputs.denoise) {
-            document.getElementById('denoiseValue').value = promptData["40"].inputs.denoise;
-        }
-
-        // 文件名前缀
-        if (promptData["9"] && promptData["9"].inputs.filename_prefix) {
-            let prefix_parts = promptData["9"].inputs.filename_prefix.split('/');
-            prefix_parts.shift();
-            document.getElementById('filePrefix').value = prefix_parts.join('/');;
-        }
-
-        if (promptData["42"] && promptData["42"].inputs.filename_prefix) {
-            let prefix_parts = promptData["42"].inputs.filename_prefix.split('/');
-            prefix_parts.shift();
-            document.getElementById('filePrefix').value = prefix_parts.join('/');
-        }
+        await fillFormFromPromptData(promptData);
 
         // 关闭预览
         closePreview();
@@ -1199,12 +1265,29 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoEmpty').classList.add('hidden');
     
     document.getElementById('popupInfoSize').textContent = info.size;
-    document.getElementById('popupInfoModel').textContent = info.model;
-    document.getElementById('popupInfoModel').title = info.model;
     document.getElementById('popupInfoSampler').textContent = info.sampler;
     document.getElementById('popupInfoScheduler').textContent = info.scheduler;
     document.getElementById('popupInfoSteps').textContent = info.steps;
     document.getElementById('popupInfoCfg').textContent = info.cfg;
+
+    // VAE名称映射
+    let displayVae = info.vae;
+    if (config && config.vae_models && info.vae && info.vae !== '-') {
+        const vaeItem = config.vae_models.find(v => v.value === info.vae);
+        if (vaeItem) displayVae = vaeItem.text;
+    }
+    document.getElementById('popupInfoVae').textContent = displayVae;
+    document.getElementById('popupInfoVae').title = info.vae;
+
+    // 模型名称映射
+    let displayModel = info.model;
+    if (config && config.diffusion_models && info.model && info.model !== '-') {
+        const modelItem = config.diffusion_models.find(m => m.value === info.model);
+        if (modelItem) displayModel = modelItem.text;
+    }
+    document.getElementById('popupInfoModel').textContent = displayModel;
+    document.getElementById('popupInfoModel').title = info.model;
+
     document.getElementById('popupInfoSeed').textContent = info.seed;
     document.getElementById('popupInfoSeed').title = info.seed;
     document.getElementById('popupInfoPrompt').textContent = info.prompt || '无提示词';

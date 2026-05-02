@@ -197,7 +197,9 @@ function extractPromptFromPNG(uint8Array) {
                             text = new TextDecoder().decode(data.slice(nullIndex + 1));
                         }
                         const prompt = JSON.parse(text);
-                        return extractPromptDataFromPromptText(text);
+                        const result = extractPromptDataFromPromptText(text);
+                        result._raw = text;
+                        return result;
                     } catch (e) {
                         console.error('解析 JSON 失败:', e);
                     }

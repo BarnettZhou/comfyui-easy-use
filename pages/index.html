@@ -533,6 +533,14 @@
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
             <div class="glass rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 border border-slate-200/50 dark:border-slate-700/50 p-3">
                 <div class="flex items-center gap-3">
+                    <!-- 导入按钮 -->
+                    <button onclick="importFromClipboard()" class="flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 px-4 rounded-xl font-bold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-200 flex items-center justify-center space-x-2 active:scale-[0.98]" title="从剪贴板导入工作流">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                        </svg>
+                        <span class="hidden sm:inline">导入</span>
+                    </button>
+                    
                     <!-- 开始生成按钮 -->
                     <button id="generateBtn" onclick="queuePrompt()" class="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3.5 px-6 rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none active:scale-[0.98]">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -698,7 +706,7 @@
                 
                 <!-- 信息内容 -->
                 <div id="popupInfoContent" class="hidden space-y-4">
-                    <!-- 基础信息网格 -->
+                    <!-- 基础信息网格 - 第一行: 尺寸、采样器、调度器、步数 -->
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">尺寸</p>
@@ -709,26 +717,30 @@
                             <p id="popupInfoSampler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
                         </div>
                         <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">调度器</p>
+                            <p id="popupInfoScheduler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">步数</p>
                             <p id="popupInfoSteps" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
                         </div>
+                    </div>
+                    
+                    <!-- 更多详情 - 第二行: CFG、VAE、模型、种子 -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">CFG</p>
                             <p id="popupInfoCfg" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
                         </div>
-                    </div>
-                    
-                    <!-- 更多详情 -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">调度器</p>
-                            <p id="popupInfoScheduler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">VAE</p>
+                            <p id="popupInfoVae" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
                         </div>
-                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">模型</p>
                             <p id="popupInfoModel" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
                         </div>
-                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
                             <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">种子</p>
                             <p id="popupInfoSeed" class="text-slate-800 dark:text-slate-200 text-sm font-mono truncate" title="">-</p>
                         </div>

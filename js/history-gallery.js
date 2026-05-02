@@ -12,6 +12,7 @@ let currentPreviewIndex = -1; // 当前预览的图片索引
 let currentPromptInfo = null; // 当前图片的 prompt 信息
 let isInfoPopupOpen = false; // 信息弹窗是否打开
 let isFolderSectionCollapsed = false; // 目录区域是否收起
+let currentWorkflowText = null; // 当前图片的原始工作流 JSON
 
 // 视图模式状态
 let currentViewMode = 'folder'; // 'folder' | 'infinite'
@@ -53,7 +54,10 @@ function toggleFolderSection() {
 }
 
 // 初始化
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // 先加载配置
+    await initServerConfig();
+    
     // 初始化视图模式
     initViewMode();
     
@@ -371,6 +375,8 @@ async function openPreview(index) {
     
     // 预解析图片信息（但不显示）
     await preloadImageInfo(currentImages[index].fullPath);
+    // 预加载工作流
+    await preloadWorkflowInfo(currentImages[index].fullPath);
 }
 
 /**
@@ -402,6 +408,8 @@ async function prevImage(event) {
         updateNavButtons();
         // 预加载新图片信息
         await preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
+        // 预加载工作流
+        await preloadWorkflowInfo(currentImages[currentPreviewIndex].fullPath);
         // 如果弹窗已打开，更新显示
         if (isInfoPopupOpen) {
             resetPopupInfo();
@@ -432,6 +440,8 @@ async function nextImage(event) {
         updateNavButtons();
         // 预加载新图片信息
         await preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
+        // 预加载工作流
+        await preloadWorkflowInfo(currentImages[currentPreviewIndex].fullPath);
         // 如果弹窗已打开，更新显示
         if (isInfoPopupOpen) {
             resetPopupInfo();
@@ -492,6 +502,27 @@ async function preloadImageInfo(imageUrl) {
         }
     } catch (error) {
         console.error('预加载图片信息失败:', error);
+    }
+}
+
+/**
+ * 预加载图片工作流（不显示）
+ * @param {string} imageUrl - 图片 URL
+ */
+async function preloadWorkflowInfo(imageUrl) {
+    try {
+        const response = await fetch(imageUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // 解析 PNG 获取 prompt 信息（同时获取原始工作流 JSON）
+        const promptData = extractPromptFromPNG(uint8Array);
+        
+        if (promptData && promptData._raw) {
+            currentWorkflowText = promptData._raw;
+        }
+    } catch (error) {
+        console.error('预加载工作流失败:', error);
     }
 }
 
@@ -595,9 +626,22 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoScheduler').textContent = info.scheduler;
     document.getElementById('popupInfoSteps').textContent = info.steps;
     document.getElementById('popupInfoCfg').textContent = info.cfg;
-    document.getElementById('popupInfoVae').textContent = info.vae;
+    // VAE名称映射
+    let displayVae = info.vae;
+    if (config && config.vae_models && info.vae && info.vae !== '-') {
+        const vaeItem = config.vae_models.find(v => v.value === info.vae);
+        if (vaeItem) displayVae = vaeItem.text;
+    }
+    document.getElementById('popupInfoVae').textContent = displayVae;
     document.getElementById('popupInfoVae').title = info.vae;
-    document.getElementById('popupInfoModel').textContent = info.model;
+
+    // 模型名称映射
+    let displayModel = info.model;
+    if (config && config.diffusion_models && info.model && info.model !== '-') {
+        const modelItem = config.diffusion_models.find(m => m.value === info.model);
+        if (modelItem) displayModel = modelItem.text;
+    }
+    document.getElementById('popupInfoModel').textContent = displayModel;
     document.getElementById('popupInfoModel').title = info.model;
     document.getElementById('popupInfoSeed').textContent = info.seed;
     document.getElementById('popupInfoSeed').title = info.seed;
@@ -663,6 +707,22 @@ async function copyPromptFromPopup() {
         }
     } else {
         showToast('没有可复制的提示词', 'error');
+    }
+}
+
+/**
+ * 复制当前图片的 ComfyUI 工作流到剪贴板
+ */
+async function copyWorkflow() {
+    if (currentWorkflowText) {
+        const success = await copyToClipboard(currentWorkflowText);
+        if (success) {
+            showToast('工作流已复制');
+        } else {
+            showToast('复制失败，请手动复制', 'error');
+        }
+    } else {
+        showToast('未能提取到工作流', 'error');
     }
 }
 
@@ -1428,7 +1488,7 @@ async function updateInfiniteTotalCount() {
  * 打开无限浏览模式下的全屏预览
  * @param {number} index - 图片索引
  */
-function openInfinitePreview(index) {
+async function openInfinitePreview(index) {
     // 安全检查
     if (index < 0 || index >= infiniteImages.length) {
         console.error(`[预览] 索引 ${index} 超出范围 (0-${infiniteImages.length - 1})`);
@@ -1452,7 +1512,9 @@ function openInfinitePreview(index) {
     updateNavButtons();
     
     // 预解析图片信息
-    preloadImageInfo(infiniteImages[index].fullPath);
+    await preloadImageInfo(infiniteImages[index].fullPath);
+    // 预加载工作流
+    await preloadWorkflowInfo(infiniteImages[index].fullPath);
 }
 
 /**
