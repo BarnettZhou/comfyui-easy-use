@@ -35,8 +35,26 @@ function getLocalIP() {
     return '127.0.0.1';
 }
 
+// 解析命令行参数
+function parseArgs() {
+    const args = process.argv.slice(2);
+    let port = 11451;
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--port' && args[i + 1]) {
+            const p = parseInt(args[i + 1], 10);
+            if (!isNaN(p) && p > 0 && p <= 65535) {
+                port = p;
+            } else {
+                console.warn(`[警告] 无效的端口值: ${args[i + 1]}，使用默认端口 11451`);
+            }
+            i++;
+        }
+    }
+    return port;
+}
+
 // 服务器配置
-const PORT = 11451;
+const PORT = parseArgs();
 const HOST = '0.0.0.0'; // 允许所有设备访问
 
 // easy-use 目录路径
