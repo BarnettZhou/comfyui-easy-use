@@ -1236,35 +1236,26 @@ async function jumpToDate(date) {
 /**
  * 加载图片直到指定索引
  * @param {number} targetIndex - 目标索引（相对于整个列表）
- * @returns {number} 目标元素在新列表中的索引（通常是 0）
+ * @returns {number} 目标元素在当前列表中的索引
  */
 async function loadUntilIndex(targetIndex) {
-    // 计算应该从哪个 offset 开始加载
-    // 让目标图片出现在第一页，方便用户看到
-    const startOffset = targetIndex;
+    console.log(`[加载] 目标索引: ${targetIndex}, 当前已加载: ${infiniteOffset}`);
     
-    console.log(`[加载] 重置加载，目标索引: ${targetIndex}, 起始偏移: ${startOffset}`);
+    // 如果目标索引在当前已加载范围内，直接返回
+    if (targetIndex < infiniteOffset) {
+        return targetIndex;
+    }
     
-    // 清空当前列表，重新从 startOffset 加载
-    infiniteImages = [];
-    infiniteOffset = startOffset;
-    hasMoreInfiniteImages = true;
-    document.getElementById('infiniteImageGrid').innerHTML = '';
-    
-    // 加载一批图片（默认 limit 数量）
-    // 这样目标图片会是列表中的第一个（索引 0）
-    await loadInfiniteImages();
-    
-    // 如果还有更多，再加载一批确保有足够内容
-    if (hasMoreInfiniteImages && infiniteImages.length < infiniteLimit) {
+    // 否则继续向后加载直到覆盖目标索引
+    while (targetIndex >= infiniteOffset && hasMoreInfiniteImages) {
         await loadInfiniteImages();
     }
     
     // 更新日期起始索引
     updateDateGroupStartIndices();
     
-    // 返回目标元素在新列表中的索引（总是 0，因为我们从目标位置开始加载）
-    return 0;
+    // 返回目标元素在当前列表中的索引
+    return targetIndex < infiniteOffset ? targetIndex : -1;
 }
 
 /**

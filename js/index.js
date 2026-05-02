@@ -1,7 +1,8 @@
 // 全局状态控制
 let isGenerating = false;
 let shouldStop = false;
-let clearOnNextRender = false; 
+let clearOnNextRender = false;
+let hideProgressTimer = null; // 用于清除延迟隐藏进度条的定时器 
 let historyImages = [];     // 存储历史图片URL数组
 let historyImageData = [];  // 存储历史图片URL和任务ID的关联信息
 let currentPreviewIndex = 0; // 当前预览图片的索引 
@@ -127,7 +128,10 @@ function setupWebSocket() {
             
             if (msg.type === 'executing' && msg.data.node === null) {
                 // 队列中所有任务执行完毕
-                setTimeout(() => {
+                // 如果当前有新任务在运行，不隐藏进度条（避免旧任务的延迟事件影响新任务）
+                if (isGenerating) return;
+                if (hideProgressTimer) clearTimeout(hideProgressTimer);
+                hideProgressTimer = setTimeout(() => {
                     document.getElementById('progressContainer').classList.add('hidden');
                 }, 2000);
             }
@@ -273,6 +277,12 @@ async function queuePrompt() {
     shouldStop = false;
     clearOnNextRender = true;
     
+    // 清除之前可能存在的隐藏进度条定时器，防止旧任务的定时器影响新任务
+    if (hideProgressTimer) {
+        clearTimeout(hideProgressTimer);
+        hideProgressTimer = null;
+    }
+    
     // 显示进度条并重置进度
     document.getElementById('progressContainer').classList.remove('hidden');
     resetProgress();
@@ -387,8 +397,10 @@ async function queuePrompt() {
         btn.classList.add('hover:bg-blue-700');
         
         // 所有任务执行完毕后隐藏进度条
-        setTimeout(() => {
+        if (hideProgressTimer) clearTimeout(hideProgressTimer);
+        hideProgressTimer = setTimeout(() => {
             document.getElementById('progressContainer').classList.add('hidden');
+            hideProgressTimer = null;
         }, 2000);
     }
 }
