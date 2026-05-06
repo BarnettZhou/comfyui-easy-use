@@ -6,6 +6,7 @@ let currentTaskId = null;   // 当前预览图片的任务ID
 let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
 let historyPollingTimer = null; // 历史记录轮询定时器
 let isAutoRefreshEnabled = false; // 自动刷新状态
+let currentImageExtraInfo = { folder: '-', time: '-' }; // 当前图片的额外信息（目录、时间）
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', async function() {
@@ -21,6 +22,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 });
+
+/**
+ * 格式化时间用于 popup 显示
+ * @param {number|string} input - 时间戳（秒）或 ISO 日期字符串
+ * @returns {string}
+ */
+function formatPopupTime(input) {
+    if (!input || input === '-') return '-';
+    let date;
+    if (typeof input === 'number') {
+        date = new Date(input * 1000);
+    } else {
+        date = new Date(input);
+    }
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).replace(/\//g, '-');
+}
+
+/**
+ * 从 subfolder 提取所在目录（最近一级）
+ * @param {string} subfolder
+ * @returns {string}
+ */
+function extractFolderFromSubfolder(subfolder) {
+    if (!subfolder) return '-';
+    const parts = subfolder.split('/').filter(p => p);
+    return parts.length > 0 ? parts[parts.length - 1] : '-';
+}
 
 // 加载历史记录
 async function loadHistory() {
@@ -48,11 +83,14 @@ async function loadHistory() {
         const samplerName = prompt['3']?.inputs?.sampler_name || '-';
         const scheduler = prompt['3']?.inputs?.scheduler || '-';
         const promptText = prompt['6']?.inputs?.text || '';
+        const folder = extractFolderFromSubfolder(item.outputs[Object.keys(item.outputs)[0]]?.images?.[0]?.subfolder);
+        const time = formatPopupTime(item.prompt[0]);
         
         for(let nid in item.outputs) {
             item.outputs[nid].images?.forEach(img => {
                 // 生成唯一标识，防止重复加载相同图片（包含taskId、节点ID和文件名）
                 const imageKey = `${taskId}-${nid}-${img.filename}`;
+                const imgFolder = extractFolderFromSubfolder(img.subfolder);
                 
                 // 检查图片是否已经显示，如果没有则处理
                 if (!displayedTaskIds.has(imageKey)) {
@@ -75,7 +113,7 @@ async function loadHistory() {
                     i.setAttribute('data-src', url); // 存储真实图片URL
                     i.loading = 'lazy';
                     i.className = 'w-full h-full object-cover group-hover:scale-105 transition-transform duration-300';
-                    i.onclick = () => openPreview(url, taskId);
+                    i.onclick = () => openPreview(url, taskId, imgFolder, time);
 
                     // 当图片进入视口时加载真实图片，离开视口时回收资源
                     const observer = new IntersectionObserver((entries) => {
@@ -111,7 +149,7 @@ async function loadHistory() {
                     imgWrapper.appendChild(i);
                     imgWrapper.appendChild(label);
                     imgWrapper.appendChild(overlay);
-                    imgWrapper.onclick = () => openPreview(url, taskId);
+                    imgWrapper.onclick = () => openPreview(url, taskId, imgFolder, time);
                     
                     container.appendChild(imgWrapper);
                     
@@ -149,7 +187,7 @@ async function loadHistory() {
                     // 收集新条目（保持最新的在前面）
                     newEntries.unshift(container);
                     newHistoryImages.unshift(url);
-                    newHistoryImageData.unshift({ url, taskId });
+                    newHistoryImageData.unshift({ url, taskId, folder: imgFolder, time });
                 }
             });
         }
@@ -234,7 +272,7 @@ async function refreshHistory() {
 }
 
 // 打开预览
-function openPreview(url, taskId) {
+function openPreview(url, taskId, folder = '-', time = '-') {
     const previewImg = document.getElementById('previewImg');
     const fullPreview = document.getElementById('fullPreview');
     
@@ -252,6 +290,9 @@ function openPreview(url, taskId) {
     const nextBtn = document.getElementById('nextBtn');
     if (prevBtn) prevBtn.classList.remove('hidden');
     if (nextBtn) nextBtn.classList.remove('hidden');
+    
+    // 设置当前图片额外信息
+    currentImageExtraInfo = { folder, time };
 }
 
 // 关闭预览
@@ -280,6 +321,9 @@ function prevImage() {
         if (historyImageData[currentPreviewIndex]) {
             currentTaskId = historyImageData[currentPreviewIndex].taskId;
         }
+        // 更新图片额外信息
+        const data = historyImageData[currentPreviewIndex];
+        currentImageExtraInfo = data ? { folder: data.folder || '-', time: data.time || '-' } : { folder: '-', time: '-' };
     }
 }
 
@@ -293,6 +337,9 @@ function nextImage() {
         if (historyImageData[currentPreviewIndex]) {
             currentTaskId = historyImageData[currentPreviewIndex].taskId;
         }
+        // 更新图片额外信息
+        const data = historyImageData[currentPreviewIndex];
+        currentImageExtraInfo = data ? { folder: data.folder || '-', time: data.time || '-' } : { folder: '-', time: '-' };
     }
 }
 
@@ -530,6 +577,11 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoSeed').textContent = info.seed;
     document.getElementById('popupInfoSeed').title = info.seed;
     document.getElementById('popupInfoPrompt').textContent = info.prompt || '无提示词';
+    
+    // 额外信息：所在目录、生成时间
+    document.getElementById('popupInfoFolder').textContent = currentImageExtraInfo.folder;
+    document.getElementById('popupInfoFolder').title = currentImageExtraInfo.folder;
+    document.getElementById('popupInfoTime').textContent = currentImageExtraInfo.time;
 }
 
 /**
@@ -539,6 +591,9 @@ function showEmptyPopupInfo() {
     document.getElementById('popupInfoLoading').classList.add('hidden');
     document.getElementById('popupInfoContent').classList.add('hidden');
     document.getElementById('popupInfoEmpty').classList.remove('hidden');
+    // 即使 PNG 没有元数据，也显示文件信息
+    document.getElementById('popupInfoFolder').textContent = currentImageExtraInfo.folder;
+    document.getElementById('popupInfoTime').textContent = currentImageExtraInfo.time;
 }
 
 /**

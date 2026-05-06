@@ -8,6 +8,7 @@ let historyImageData = [];  // 存储历史图片URL和任务ID的关联信息
 let currentPreviewIndex = 0; // 当前预览图片的索引 
 let currentTaskId = null;   // 当前预览图片的任务ID
 let prefix; // 文件保存前缀全局变量
+let currentImageExtraInfo = { folder: '-', time: '-' }; // 当前图片的额外信息（目录、时间）
 let historyPollingTimer = null; // 历史记录轮询定时器
 let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
 let socket; // WebSocket 实例，用于监听进度更新
@@ -405,6 +406,40 @@ async function queuePrompt() {
     }
 }
 
+/**
+ * 格式化时间用于 popup 显示
+ * @param {number|string} input - 时间戳（秒）或 ISO 日期字符串
+ * @returns {string}
+ */
+function formatPopupTime(input) {
+    if (!input || input === '-') return '-';
+    let date;
+    if (typeof input === 'number') {
+        date = new Date(input * 1000);
+    } else {
+        date = new Date(input);
+    }
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).replace(/\//g, '-');
+}
+
+/**
+ * 从 subfolder 提取所在目录（最近一级）
+ * @param {string} subfolder
+ * @returns {string}
+ */
+function extractFolderFromSubfolder(subfolder) {
+    if (!subfolder) return '-';
+    const parts = subfolder.split('/').filter(p => p);
+    return parts.length > 0 ? parts[parts.length - 1] : '-';
+}
+
 function trackTask(id) {
     return new Promise((resolve) => {
         const timer = setInterval(async () => {
@@ -413,7 +448,7 @@ function trackTask(id) {
                 const data = await res.json();
                 if(data[id]) {
                     clearInterval(timer);
-                    renderImg(data[id].outputs);
+                    renderImg(data[id].outputs, data[id].prompt[0]);
                     resolve(); 
                 }
             } catch(e) { }
@@ -422,7 +457,7 @@ function trackTask(id) {
 }
 
 // ========== 渲染图片 ==========
-function renderImg(outputs) {
+function renderImg(outputs, timestamp) {
     const container = document.getElementById('imageContainer');
     const emptyState = document.getElementById('emptyState');
     const resultCount = document.getElementById('resultCount');
@@ -445,13 +480,18 @@ function renderImg(outputs) {
     for (let nodeId of nodeIds) {
         outputs[nodeId].images.forEach(img => {
             const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+            const folder = extractFolderFromSubfolder(img.subfolder);
+            const time = formatPopupTime(timestamp);
             
-            const wrapper = document.createElement('div');
-            wrapper.className = 'relative group animate-fade-in';
+            // 存储图片额外信息，供 popup 使用
+            const wrapperEl = document.createElement('div');
+            wrapperEl.dataset.folder = folder;
+            wrapperEl.dataset.time = time;
+            wrapperEl.className = 'relative group animate-fade-in';
             
             const imgWrapper = document.createElement('div');
             imgWrapper.className = 'aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 img-skeleton cursor-pointer';
-            imgWrapper.onclick = () => openResultPreview(url);
+            imgWrapper.onclick = () => openResultPreview(url, folder, time);
             
             const imgEl = document.createElement('img');
             imgEl.src = url;
@@ -470,11 +510,11 @@ function renderImg(outputs) {
             const overlay = document.createElement('div');
             overlay.className = 'absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl pointer-events-none';
             
-            wrapper.appendChild(imgWrapper);
-            wrapper.appendChild(label);
-            wrapper.appendChild(overlay);
+            wrapperEl.appendChild(imgWrapper);
+            wrapperEl.appendChild(label);
+            wrapperEl.appendChild(overlay);
             
-            container.prepend(wrapper);
+            container.prepend(wrapperEl);
             imageCount++;
         });
     }
@@ -593,9 +633,11 @@ async function loadHistory() {
                     
                     container.appendChild(infoDiv);
                     
+                    const folder = extractFolderFromSubfolder(img.subfolder);
+                    const time = formatPopupTime(item.prompt[0]);
                     newEntries.unshift(container);
                     newHistoryImages.unshift(url);
-                    newHistoryImageData.unshift({ url, taskId });
+                    newHistoryImageData.unshift({ url, taskId, folder, time });
                 }
             });
         }
@@ -643,6 +685,10 @@ function openPreview(url, taskId) {
     // 显示导航按钮
     if (prevBtn) prevBtn.classList.remove('hidden');
     if (nextBtn) nextBtn.classList.remove('hidden');
+    
+    // 设置当前图片额外信息
+    const data = historyImageData.find(d => d.url === url);
+    currentImageExtraInfo = data ? { folder: data.folder || '-', time: data.time || '-' } : { folder: '-', time: '-' };
 }
 
 function closePreview() {
@@ -658,7 +704,7 @@ function closePreview() {
 let currentResultPreviewUrl = null;
 
 // 预览生成结果图片（独立预览，不参与历史导航）
-function openResultPreview(url) {
+function openResultPreview(url, folder = '-', time = '-') {
     const preview = document.getElementById('fullPreview');
     const previewImg = document.getElementById('previewImg');
     const prevBtn = document.getElementById('prevBtn');
@@ -678,6 +724,9 @@ function openResultPreview(url) {
     // 隐藏导航按钮
     if (prevBtn) prevBtn.classList.add('hidden');
     if (nextBtn) nextBtn.classList.add('hidden');
+    
+    // 设置当前图片额外信息
+    currentImageExtraInfo = { folder, time };
 }
 
 function toggleDrawer() { 
@@ -906,48 +955,119 @@ function isValidComfyUIWorkflow(data) {
 }
 
 /**
+ * 处理导入的文本数据（公共逻辑）
+ * @param {string} text - JSON 文本
+ */
+async function processImportData(text) {
+    if (!text.trim()) {
+        showToast('内容为空', 'error');
+        return false;
+    }
+    
+    // 解析 JSON
+    let promptData;
+    try {
+        promptData = JSON.parse(text);
+    } catch (e) {
+        showToast('内容不是有效的 JSON', 'error');
+        return false;
+    }
+    
+    // 验证是否为 ComfyUI 工作流
+    if (!isValidComfyUIWorkflow(promptData)) {
+        showToast('内容不是合法的 ComfyUI 工作流', 'error');
+        return false;
+    }
+    
+    // 填充表单
+    await fillFormFromPromptData(promptData);
+    showToast('工作流已导入');
+    return true;
+}
+
+/**
+ * 打开手动导入弹窗
+ */
+function openImportModal() {
+    const modal = document.getElementById('importModal');
+    const overlay = document.getElementById('importModalOverlay');
+    const content = document.getElementById('importModalContent');
+    const textarea = document.getElementById('importModalTextarea');
+    
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    if (textarea) textarea.value = '';
+    
+    // 显示动画
+    setTimeout(() => {
+        if (overlay) overlay.classList.remove('opacity-0');
+        if (content) content.classList.add('show');
+        if (textarea) textarea.focus();
+    }, 10);
+}
+
+/**
+ * 关闭手动导入弹窗
+ */
+function closeImportModal() {
+    const modal = document.getElementById('importModal');
+    const overlay = document.getElementById('importModalOverlay');
+    const content = document.getElementById('importModalContent');
+    
+    if (overlay) overlay.classList.add('opacity-0');
+    if (content) content.classList.remove('show');
+    
+    setTimeout(() => {
+        if (modal) modal.classList.add('hidden');
+    }, 300);
+}
+
+/**
+ * 提交手动导入
+ */
+async function submitManualImport() {
+    const textarea = document.getElementById('importModalTextarea');
+    const text = textarea ? textarea.value : '';
+    const success = await processImportData(text);
+    if (success) {
+        closeImportModal();
+    }
+}
+
+/**
  * 从剪贴板导入 ComfyUI 工作流
  */
 async function importFromClipboard() {
     try {
         let text = '';
+        let clipboardSupported = false;
         
         // 尝试读取剪贴板
         if (navigator.clipboard && window.isSecureContext) {
             try {
                 text = await navigator.clipboard.readText();
+                clipboardSupported = true;
             } catch (err) {
-                showToast('无法读取剪贴板，请确保已授权', 'error');
+                // 读取失败（常见于手机浏览器无权限），唤起手动输入弹窗
+                console.log('剪贴板读取失败:', err);
+                openImportModal();
                 return;
             }
         } else {
-            showToast('当前环境不支持读取剪贴板', 'error');
+            // 不支持剪贴板 API，唤起手动输入弹窗
+            openImportModal();
             return;
         }
         
-        if (!text.trim()) {
+        // 如果支持剪贴板但内容为空，也允许手动输入
+        if (clipboardSupported && !text.trim()) {
             showToast('剪贴板为空', 'error');
+            openImportModal();
             return;
         }
         
-        // 解析 JSON
-        let promptData;
-        try {
-            promptData = JSON.parse(text);
-        } catch (e) {
-            showToast('剪贴板内容不是有效的 JSON', 'error');
-            return;
-        }
-        
-        // 验证是否为 ComfyUI 工作流
-        if (!isValidComfyUIWorkflow(promptData)) {
-            showToast('剪贴板内容不是合法的 ComfyUI 工作流', 'error');
-            return;
-        }
-        
-        // 填充表单
-        await fillFormFromPromptData(promptData);
-        showToast('工作流已导入');
+        await processImportData(text);
     } catch (error) {
         console.error('导入工作流失败:', error);
         showToast('导入失败，请重试', 'error');
@@ -993,6 +1113,9 @@ function prevImage() {
         if (historyImageData[currentPreviewIndex]) {
             currentTaskId = historyImageData[currentPreviewIndex].taskId;
         }
+        // 更新图片额外信息
+        const data = historyImageData[currentPreviewIndex];
+        currentImageExtraInfo = data ? { folder: data.folder || '-', time: data.time || '-' } : { folder: '-', time: '-' };
     }
 }
 
@@ -1005,6 +1128,9 @@ function nextImage() {
         if (historyImageData[currentPreviewIndex]) {
             currentTaskId = historyImageData[currentPreviewIndex].taskId;
         }
+        // 更新图片额外信息
+        const data = historyImageData[currentPreviewIndex];
+        currentImageExtraInfo = data ? { folder: data.folder || '-', time: data.time || '-' } : { folder: '-', time: '-' };
     }
 }
 
@@ -1303,6 +1429,11 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoSeed').textContent = info.seed;
     document.getElementById('popupInfoSeed').title = info.seed;
     document.getElementById('popupInfoPrompt').textContent = info.prompt || '无提示词';
+    
+    // 额外信息：所在目录、生成时间
+    document.getElementById('popupInfoFolder').textContent = currentImageExtraInfo.folder;
+    document.getElementById('popupInfoFolder').title = currentImageExtraInfo.folder;
+    document.getElementById('popupInfoTime').textContent = currentImageExtraInfo.time;
 }
 
 /**
@@ -1312,6 +1443,9 @@ function showEmptyPopupInfo() {
     document.getElementById('popupInfoLoading').classList.add('hidden');
     document.getElementById('popupInfoContent').classList.add('hidden');
     document.getElementById('popupInfoEmpty').classList.remove('hidden');
+    // 即使 PNG 没有元数据，也显示文件信息
+    document.getElementById('popupInfoFolder').textContent = currentImageExtraInfo.folder;
+    document.getElementById('popupInfoTime').textContent = currentImageExtraInfo.time;
 }
 
 /**

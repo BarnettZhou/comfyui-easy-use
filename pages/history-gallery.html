@@ -653,6 +653,18 @@
                         </div>
                     </div>
                     
+                    <!-- 文件信息 - 第三行: 所在目录、生成时间 -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">所在目录</p>
+                            <p id="popupInfoFolder" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">生成时间</p>
+                            <p id="popupInfoTime" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
+                        </div>
+                    </div>
+                    
                     <!-- 提示词 -->
                     <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                         <div class="flex items-center justify-between mb-3">
