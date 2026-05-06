@@ -1351,13 +1351,72 @@ async function loadUntilIndex(targetIndex) {
         return targetIndex;
     }
     
-    // 否则继续向后加载直到覆盖目标索引
-    while (targetIndex >= infiniteOffset && hasMoreInfiniteImages) {
-        await loadInfiniteImages();
+    if (!hasMoreInfiniteImages) {
+        return -1;
     }
     
-    // 更新日期起始索引
-    updateDateGroupStartIndices();
+    // 计算需要加载的所有批次
+    const startOffset = infiniteOffset;
+    const endOffset = Math.ceil((targetIndex + 1) / infiniteLimit) * infiniteLimit;
+    const batches = [];
+    for (let offset = startOffset; offset < endOffset; offset += infiniteLimit) {
+        batches.push(offset);
+    }
+    
+    console.log(`[加载] 并发加载 ${batches.length} 个批次 (offset ${startOffset} ~ ${endOffset})...`);
+    
+    // 并发加载所有批次
+    const results = await Promise.all(batches.map(offset =>
+        fetch(`/api/infinite-images?limit=${infiniteLimit}&offset=${offset}`)
+            .then(r => r.ok ? r.json() : { files: [], hasMore: false })
+            .catch(err => {
+                console.error(`[加载] 批次 offset=${offset} 失败:`, err);
+                return { files: [], hasMore: false };
+            })
+    ));
+    
+    // 合并所有数据
+    const allFormattedImages = [];
+    let lastHasMore = false;
+    
+    for (const data of results) {
+        const newImages = data.files || [];
+        if (newImages.length > 0) {
+            const formattedImages = newImages.map(img => ({
+                name: img.name,
+                path: img.path,
+                fullPath: img.fullPath,
+                size: img.size,
+                mtime: img.mtime
+            }));
+            infiniteImages.push(...formattedImages);
+            allFormattedImages.push(...formattedImages);
+            infiniteOffset += newImages.length;
+        }
+        lastHasMore = data.hasMore;
+    }
+    
+    hasMoreInfiniteImages = lastHasMore;
+    
+    // 一次性渲染所有新加载的图片（减少多次 DocumentFragment 插入开销）
+    if (allFormattedImages.length > 0) {
+        renderInfiniteImages(allFormattedImages, startOffset === 0);
+        
+        // 更新日期起始索引
+        updateDateGroupStartIndices();
+        
+        // 首次加载时获取日期导航
+        if (startOffset === 0) {
+            loadDateNav();
+        }
+        
+        // 更新总数
+        if (infiniteTotalCount === 0) {
+            updateInfiniteTotalCount();
+        }
+    }
+    
+    console.log(`[加载] 完成，共加载 ${allFormattedImages.length} 张，当前已加载: ${infiniteOffset}`);
     
     // 返回目标元素在当前列表中的索引
     return targetIndex < infiniteOffset ? targetIndex : -1;
