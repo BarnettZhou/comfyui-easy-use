@@ -26,6 +26,7 @@ let isInfiniteLoading = false; // 是否正在加载
 let hasMoreInfiniteImages = true; // 是否还有更多图片
 let infiniteScrollObserver = null; // 无限滚动观察器
 let infiniteTotalCount = 0; // 图片总数
+let baseOffset = 0; // 当前 infiniteImages[0] 对应的真实列表偏移量（支持从任意位置跳转加载）
 
 /**
  * 切换目录区域的展开/收起状态
@@ -1183,14 +1184,14 @@ function updateDateGroupStartIndices() {
         group.startIndex = -1;
     });
     
-    // 遍历所有已加载的图片，记录每个日期的第一个出现位置
+    // 遍历所有已加载的图片，记录每个日期的第一个出现位置（转换为真实列表索引）
     for (let i = 0; i < infiniteImages.length; i++) {
         const date = extractDateFromPath(infiniteImages[i].path);
         if (!date) continue;
         
         const group = dateGroups.find(g => g.date === date);
         if (group && group.startIndex === -1) {
-            group.startIndex = i;
+            group.startIndex = baseOffset + i;
         }
     }
 }
@@ -1273,12 +1274,33 @@ function formatDateForNav(dateStr) {
  * 跳转到指定日期的图片
  * @param {string} date - 日期字符串
  */
+/**
+ * 跳转到指定日期的图片
+ * @param {string} date - 日期字符串
+ */
 async function jumpToDate(date) {
+    // 防止与进行中的加载操作冲突
+    if (isInfiniteLoading) {
+        console.log('[跳转] 等待当前加载完成...');
+        // 轮询等待加载完成（最多等 5 秒）
+        const start = Date.now();
+        while (isInfiniteLoading && Date.now() - start < 5000) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (isInfiniteLoading) {
+            showToast('正在加载中，请稍后再试', 'error');
+            return;
+        }
+    }
+
     const group = dateGroups.find(g => g.date === date);
-    if (!group) return;
-    
+    if (!group) {
+        console.warn(`[跳转] 未找到日期 ${date} 的导航分组`);
+        return;
+    }
+
     let targetIndex = group.startIndex;
-    
+
     // 如果 startIndex 为 -1，说明该日期的图片还未加载
     // 需要通过 API 获取该日期的偏移量
     if (targetIndex === -1) {
@@ -1286,140 +1308,133 @@ async function jumpToDate(date) {
         try {
             const response = await fetch(`/api/date-offset?date=${date}`);
             if (!response.ok) throw new Error('获取偏移量失败');
-            
+
             const data = await response.json();
             targetIndex = data.offset;
-            
+
+            if (targetIndex < 0) {
+                showToast('该日期暂无图片', 'error');
+                return;
+            }
+
             // 更新 group 的 startIndex，避免下次重复请求
             group.startIndex = targetIndex;
-            
-            console.log(`[跳转] 日期 ${date} 的偏移量为 ${targetIndex}`);
+
+            console.log(`[跳转] 日期 ${date} 的偏移量为 ${targetIndex}，当前 baseOffset=${baseOffset}，已加载 ${infiniteImages.length} 张`);
         } catch (error) {
             console.error('[跳转] 获取日期偏移量失败:', error);
             showToast('跳转到日期失败', 'error');
             return;
         }
     }
-    
+
     const grid = document.getElementById('infiniteImageGrid');
-    
-    // 检查目标是否已经在当前加载的范围内
-    const currentStartOffset = infiniteOffset - infiniteImages.length; // 当前已加载的起始位置
-    const isInCurrentRange = targetIndex >= currentStartOffset && targetIndex < infiniteOffset;
-    
-    if (isInCurrentRange && grid.children[targetIndex - currentStartOffset]) {
-        // 元素已存在，直接滚动
-        const relativeIndex = targetIndex - currentStartOffset;
+
+    // 检查目标是否在当前已加载范围内
+    const isInCurrentRange = targetIndex >= baseOffset && targetIndex < baseOffset + infiniteOffset;
+
+    console.log(`[跳转] targetIndex=${targetIndex}, baseOffset=${baseOffset}, infiniteOffset=${infiniteOffset}, isInRange=${isInCurrentRange}`);
+
+    if (isInCurrentRange && grid.children[targetIndex - baseOffset]) {
+        // 目标已加载，直接滚动
+        const relativeIndex = targetIndex - baseOffset;
         const targetElement = grid.children[relativeIndex];
+
+        // 验证目标图片是否确实属于请求日期
+        const imgInCard = targetElement.querySelector('img');
+        const imgSrc = imgInCard ? (imgInCard.getAttribute('data-src') || imgInCard.src) : '';
+        const actualDate = extractDateFromPath(imgSrc);
+        if (actualDate !== date) {
+            console.warn(`[跳转] 快速路径验证失败：期望 ${date}，实际 ${actualDate}，改用 API 加载`);
+            // 回退到 API 重新加载
+            targetIndex = -1;
+            group.startIndex = -1;
+            return jumpToDate(date);
+        }
+
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
+
         // 高亮效果
         targetElement.classList.add('ring-2', 'ring-primary-500');
         setTimeout(() => {
             targetElement.classList.remove('ring-2', 'ring-primary-500');
         }, 2000);
+
+        console.log(`[跳转] 快速路径：滚动到已加载位置 ${relativeIndex}`);
+        return;
+    }
+
+    // 目标不在当前范围，直接从目标偏移量附近加载（虚拟滚动思路）
+    // 向前预加载一些缓冲，让目标图片出现在批次中间偏后位置，
+    // 这样向上滚动时能看到更早的图片，向下也能继续加载。
+    const buffer = Math.floor(infiniteLimit * 0.8); // 40 张向前缓冲
+    const newBaseOffset = Math.max(0, targetIndex - buffer);
+    console.log(`[跳转] 从偏移量 ${newBaseOffset} 加载，目标在相对索引 ${targetIndex - newBaseOffset}...`);
+
+    infiniteImages = [];
+    infiniteOffset = 0;
+    baseOffset = newBaseOffset;
+    hasMoreInfiniteImages = true;
+    dateGroups.forEach(g => g.startIndex = -1);
+
+    grid.innerHTML = '';
+    document.getElementById('infiniteEndMessage').classList.add('hidden');
+
+    // 加载一批数据（只发 1 次请求）
+    await loadInfiniteImages();
+
+    // 滚动到目标图片所在的位置
+    const targetRelativeIndex = targetIndex - newBaseOffset;
+    const targetElement = grid.children[targetRelativeIndex];
+    if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        targetElement.classList.add('ring-2', 'ring-primary-500');
+        setTimeout(() => {
+            targetElement.classList.remove('ring-2', 'ring-primary-500');
+        }, 2000);
+        showToast(`已跳转到 ${formatDateForNav(date)}`, 'success');
+
+        // 验证实际滚到的图片日期
+        const imgInCard = targetElement.querySelector('img');
+        const imgSrc = imgInCard ? (imgInCard.getAttribute('data-src') || imgInCard.src) : '';
+        const actualDate = extractDateFromPath(imgSrc);
+        console.log(`[跳转] 目标日期=${date}，实际图片日期=${actualDate}，baseOffset=${baseOffset}，相对索引=${targetRelativeIndex}`);
+    } else if (grid.children[0]) {
+        console.warn(`[跳转] 目标相对索引 ${targetRelativeIndex} 越界（共 ${grid.children.length} 个子元素）`);
+        // 回退：滚动到第一个元素
+        grid.children[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-        // 如果元素不在当前视图中，重新加载从目标位置开始
-        console.log(`[跳转] 重新加载从索引 ${targetIndex} 开始...`);
-        const relativeIndex = await loadUntilIndex(targetIndex);
-        
-        const element = grid.children[relativeIndex];
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            element.classList.add('ring-2', 'ring-primary-500');
-            setTimeout(() => {
-                element.classList.remove('ring-2', 'ring-primary-500');
-            }, 2000);
-            showToast(`已跳转到 ${date}`, 'success');
-        } else {
-            console.error('[跳转] 加载后仍未找到目标元素');
-            showToast('跳转到日期失败', 'error');
-        }
+        console.error(`[跳转] 加载后 grid 为空`);
     }
 }
 
 /**
- * 加载图片直到指定索引
+ * 加载图片直到指定索引（串行加载，避免并发请求风暴）
  * @param {number} targetIndex - 目标索引（相对于整个列表）
  * @returns {number} 目标元素在当前列表中的索引
  */
 async function loadUntilIndex(targetIndex) {
-    console.log(`[加载] 目标索引: ${targetIndex}, 当前已加载: ${infiniteOffset}`);
+    console.log(`[加载] 目标索引: ${targetIndex}, 当前已加载: ${baseOffset + infiniteOffset}`);
     
-    // 如果目标索引在当前已加载范围内，直接返回
-    if (targetIndex < infiniteOffset) {
-        return targetIndex;
+    // 如果目标索引在当前已加载范围内，直接返回相对索引
+    if (targetIndex >= baseOffset && targetIndex < baseOffset + infiniteOffset) {
+        return targetIndex - baseOffset;
     }
     
     if (!hasMoreInfiniteImages) {
         return -1;
     }
     
-    // 计算需要加载的所有批次
-    const startOffset = infiniteOffset;
-    const endOffset = Math.ceil((targetIndex + 1) / infiniteLimit) * infiniteLimit;
-    const batches = [];
-    for (let offset = startOffset; offset < endOffset; offset += infiniteLimit) {
-        batches.push(offset);
+    // 串行加载直到覆盖目标索引
+    while (targetIndex >= baseOffset + infiniteOffset && hasMoreInfiniteImages) {
+        await loadInfiniteImages();
     }
     
-    console.log(`[加载] 并发加载 ${batches.length} 个批次 (offset ${startOffset} ~ ${endOffset})...`);
+    // 更新日期起始索引
+    updateDateGroupStartIndices();
     
-    // 并发加载所有批次
-    const results = await Promise.all(batches.map(offset =>
-        fetch(`/api/infinite-images?limit=${infiniteLimit}&offset=${offset}`)
-            .then(r => r.ok ? r.json() : { files: [], hasMore: false })
-            .catch(err => {
-                console.error(`[加载] 批次 offset=${offset} 失败:`, err);
-                return { files: [], hasMore: false };
-            })
-    ));
-    
-    // 合并所有数据
-    const allFormattedImages = [];
-    let lastHasMore = false;
-    
-    for (const data of results) {
-        const newImages = data.files || [];
-        if (newImages.length > 0) {
-            const formattedImages = newImages.map(img => ({
-                name: img.name,
-                path: img.path,
-                fullPath: img.fullPath,
-                size: img.size,
-                mtime: img.mtime
-            }));
-            infiniteImages.push(...formattedImages);
-            allFormattedImages.push(...formattedImages);
-            infiniteOffset += newImages.length;
-        }
-        lastHasMore = data.hasMore;
-    }
-    
-    hasMoreInfiniteImages = lastHasMore;
-    
-    // 一次性渲染所有新加载的图片（减少多次 DocumentFragment 插入开销）
-    if (allFormattedImages.length > 0) {
-        renderInfiniteImages(allFormattedImages, startOffset === 0);
-        
-        // 更新日期起始索引
-        updateDateGroupStartIndices();
-        
-        // 首次加载时获取日期导航
-        if (startOffset === 0) {
-            loadDateNav();
-        }
-        
-        // 更新总数
-        if (infiniteTotalCount === 0) {
-            updateInfiniteTotalCount();
-        }
-    }
-    
-    console.log(`[加载] 完成，共加载 ${allFormattedImages.length} 张，当前已加载: ${infiniteOffset}`);
-    
-    // 返回目标元素在当前列表中的索引
-    return targetIndex < infiniteOffset ? targetIndex : -1;
+    // 返回目标元素在当前列表中的相对索引
+    return targetIndex < baseOffset + infiniteOffset ? targetIndex - baseOffset : -1;
 }
 
 /**
@@ -1454,8 +1469,9 @@ function updateActiveDateNav() {
     const rowIndex = Math.max(0, Math.floor(scrollTop / rowHeight));
     const visibleIndex = Math.min(rowIndex * colCount, infiniteImages.length - 1);
     
-    // 找到该索引对应的日期组
-    const group = dateGroups.find(g => visibleIndex >= g.startIndex && (g.startIndex === -1 || visibleIndex < g.startIndex + g.count));
+    // 转换为真实列表索引，再找到对应的日期组
+    const realIndex = baseOffset + visibleIndex;
+    const group = dateGroups.find(g => realIndex >= g.startIndex && (g.startIndex === -1 || realIndex < g.startIndex + g.count));
     if (group && group.startIndex !== -1) {
         // 更新导航高亮
         document.querySelectorAll('#infiniteDateNav button').forEach(btn => {
@@ -1473,6 +1489,12 @@ window.addEventListener('scroll', () => {
     if (scrollThrottleTimer) return;
     scrollThrottleTimer = setTimeout(() => {
         updateActiveDateNav();
+        
+        // 接近顶部时触发向上加载（双向无限滚动）
+        if (currentViewMode === 'infinite' && window.scrollY < 500 && baseOffset > 0 && !isInfiniteLoading) {
+            loadPreviousImages();
+        }
+        
         scrollThrottleTimer = null;
     }, 300);
 }, { passive: true });
@@ -1487,7 +1509,7 @@ async function loadInfiniteImages() {
     showInfiniteLoading(true);
     
     try {
-        const response = await fetch(`/api/infinite-images?limit=${infiniteLimit}&offset=${infiniteOffset}`);
+        const response = await fetch(`/api/infinite-images?limit=${infiniteLimit}&offset=${baseOffset + infiniteOffset}`);
         if (!response.ok) throw new Error('获取图片列表失败');
         
         const data = await response.json();
@@ -1508,10 +1530,11 @@ async function loadInfiniteImages() {
             hasMoreInfiniteImages = data.hasMore;
             
             // 渲染新加载的图片
-            renderInfiniteImages(formattedImages, infiniteOffset === newImages.length);
+            // isFirstBatch: 当前 infiniteImages 中只有这批新数据（即加载前为空）
+            renderInfiniteImages(formattedImages, infiniteImages.length === newImages.length);
             
             // 首次加载时获取日期导航
-            if (infiniteOffset === newImages.length) {
+            if (infiniteImages.length === newImages.length) {
                 loadDateNav();
             }
             
@@ -1528,7 +1551,7 @@ async function loadInfiniteImages() {
         }
         
         // 如果是第一次加载且没有数据，显示空状态
-        if (infiniteOffset === 0 && newImages.length === 0) {
+        if (infiniteImages.length === 0 && newImages.length === 0) {
             showInfiniteEmptyState();
         }
         
@@ -1539,6 +1562,132 @@ async function loadInfiniteImages() {
         isInfiniteLoading = false;
         showInfiniteLoading(false);
     }
+}
+
+/**
+ * 向上加载无限浏览图片（在 baseOffset 之前加载）
+ */
+async function loadPreviousImages() {
+    if (isInfiniteLoading || baseOffset === 0) return;
+    
+    isInfiniteLoading = true;
+    
+    const grid = document.getElementById('infiniteImageGrid');
+    // 保存参考元素用于滚动位置修正
+    let oldFirstChild = null;
+    let oldRectTop = 0;
+    if (grid && grid.firstElementChild) {
+        oldFirstChild = grid.firstElementChild;
+        oldRectTop = oldFirstChild.getBoundingClientRect().top;
+    }
+    
+    try {
+        const newBaseOffset = Math.max(0, baseOffset - infiniteLimit);
+        const limit = baseOffset - newBaseOffset;
+        
+        const response = await fetch(`/api/infinite-images?limit=${limit}&offset=${newBaseOffset}`);
+        if (!response.ok) throw new Error('获取图片列表失败');
+        
+        const data = await response.json();
+        const newImages = data.files || [];
+        
+        if (newImages.length > 0) {
+            const formattedImages = newImages.map(img => ({
+                name: img.name,
+                path: img.path,
+                fullPath: img.fullPath,
+                size: img.size,
+                mtime: img.mtime
+            }));
+            
+            // 在数组开头插入
+            infiniteImages.unshift(...formattedImages);
+            baseOffset = newBaseOffset;
+            infiniteOffset = infiniteImages.length;
+            
+            // 在 DOM 开头插入
+            renderInfiniteImagesAtTop(formattedImages);
+            
+            // 修正滚动位置，保持视觉焦点不变
+            if (oldFirstChild) {
+                const newRectTop = oldFirstChild.getBoundingClientRect().top;
+                window.scrollBy(0, newRectTop - oldRectTop);
+            }
+            
+            // 更新日期的 startIndex
+            updateDateGroupStartIndices();
+        }
+        
+    } catch (error) {
+        console.error('[无限浏览] 向上加载失败:', error);
+        showToast('加载更早图片失败', 'error');
+    } finally {
+        isInfiniteLoading = false;
+    }
+}
+
+/**
+ * 在 DOM 开头渲染无限浏览图片（用于向上加载）
+ * @param {Array} images - 图片数组
+ */
+function renderInfiniteImagesAtTop(images) {
+    const grid = document.getElementById('infiniteImageGrid');
+    
+    const fragment = document.createDocumentFragment();
+    
+    images.forEach((file, index) => {
+        // 新插入的图片在开头，索引从 0 开始
+        const relativeIndex = index;
+        
+        const card = document.createElement('div');
+        card.className = 'group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 img-skeleton hover:border-primary-300 dark:hover:border-primary-700 transition-colors duration-200';
+        card.onclick = () => openInfinitePreview(relativeIndex);
+        
+        const img = document.createElement('img');
+        img.setAttribute('data-src', file.fullPath);
+        img.alt = file.name;
+        img.className = 'lazy-image w-full h-full object-cover';
+        img.loading = 'lazy';
+        img.onload = function() {
+            card.classList.remove('img-skeleton');
+        };
+        img.onerror = function() {
+            if (!img.getAttribute('src')) return;
+            card.classList.remove('img-skeleton');
+            card.innerHTML = '<div class="w-full h-full flex items-center justify-center text-slate-400"><span class="text-xs">加载失败</span></div>';
+        };
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200';
+        overlay.innerHTML = `
+            <div class="absolute bottom-0 left-0 right-0 p-3">
+                <p class="text-white text-xs truncate">${file.name}</p>
+                <p class="text-white/70 text-xs">${formatFileSize(file.size)} · ${formatDate(file.mtime)}</p>
+            </div>
+        `;
+        
+        card.appendChild(img);
+        card.appendChild(overlay);
+        fragment.appendChild(card);
+    });
+    
+    grid.insertBefore(fragment, grid.firstChild);
+    
+    // 更新所有已有 DOM 元素的 onclick 索引（原有图片索引都后移了）
+    const existingCards = Array.from(grid.children).slice(images.length);
+    existingCards.forEach((card, i) => {
+        const newIndex = images.length + i;
+        card.onclick = () => openInfinitePreview(newIndex);
+    });
+    
+    // 为新添加的图片添加懒加载观察
+    const newCards = Array.from(grid.children).slice(0, images.length);
+    newCards.forEach(card => {
+        const img = card.querySelector('.lazy-image');
+        if (img && imageLazyObserver) {
+            imageLazyObserver.observe(img);
+        }
+    });
 }
 
 /**
@@ -1706,6 +1855,7 @@ async function refreshInfiniteView() {
     // 重置状态
     infiniteImages = [];
     infiniteOffset = 0;
+    baseOffset = 0;
     hasMoreInfiniteImages = true;
     infiniteTotalCount = 0;
     dateGroups = [];

@@ -196,8 +196,8 @@ function updateDateStatsForScan(dateStrs) {
     for (const dateStr of dateStrs) {
         const dateDir = path.join(EASY_USE_DIR, dateStr);
         if (!fs.existsSync(dateDir)) {
-            // 目录不存在，检查是否需要删除该日期的统计
-            db.updateDateStats(dateStr, 0);
+            // 目录不存在，删除该日期的统计（避免产生空导航）
+            db.deleteDateStats(dateStr);
             continue;
         }
         
@@ -216,10 +216,12 @@ function updateDateStatsForScan(dateStrs) {
             console.error(`[日期统计] 统计 ${dateStr} 失败:`, error.message);
         }
         
-        // 更新数据库
-        db.updateDateStats(dateStr, count);
+        // 更新数据库（数量为0时直接删除，避免空导航）
         if (count > 0) {
+            db.updateDateStats(dateStr, count);
             console.log(`[日期统计] ${dateStr}: ${count} 张图片`);
+        } else {
+            db.deleteDateStats(dateStr);
         }
     }
 }

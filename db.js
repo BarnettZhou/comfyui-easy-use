@@ -258,7 +258,8 @@ class ImageDatabase {
      */
     getImages(limit = 0, offset = 0) {
         return new Promise((resolve, reject) => {
-            let sql = `SELECT * FROM images ORDER BY mtime DESC`;
+            // 仅查询日期目录（YYYY-MM-DD/）下的图片，按日期倒序、同日期按 mtime 倒序
+            let sql = `SELECT * FROM images WHERE path GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*' ORDER BY SUBSTR(path, 1, 10) DESC, mtime DESC`;
             const params = [];
             
             if (limit > 0) {
@@ -303,7 +304,8 @@ class ImageDatabase {
      */
     getCount() {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT COUNT(*) as count FROM images`;
+            // 仅统计日期目录下的图片，与 getImages 过滤条件一致
+            const sql = `SELECT COUNT(*) as count FROM images WHERE path GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*'`;
             
             if (isBetterSQLite3) {
                 try {
@@ -439,6 +441,26 @@ class ImageDatabase {
     }
 
     /**
+     * 删除指定日期的统计记录
+     * @param {string} date - 日期字符串
+     */
+    deleteDateStats(date) {
+        const sql = `DELETE FROM date_stats WHERE date = ?`;
+        
+        if (isBetterSQLite3) {
+            try {
+                this.db.prepare(sql).run(date);
+            } catch (error) {
+                console.error('[DB] 删除日期统计失败:', error);
+            }
+        } else {
+            this.db.run(sql, [date], (err) => {
+                if (err) console.error('[DB] 删除日期统计失败:', err);
+            });
+        }
+    }
+
+    /**
      * 批量更新日期统计
      * @param {Object} dateCounts - { '2026-02-14': 10, '2026-02-13': 5 }
      */
@@ -518,25 +540,48 @@ class ImageDatabase {
      */
     getDateOffset(date) {
         return new Promise((resolve, reject) => {
-            // 查询该日期之前（更晚）的所有图片数量
-            // 因为图片按时间倒序，日期越大（越新）排在越前面
-            const sql = `
-                SELECT COUNT(*) as offset 
-                FROM images 
-                WHERE SUBSTR(path, 1, 10) > ?
-            `;
-            
+            // 验证目标日期是否存在图片（仅统计日期目录下的图片）
+            const checkSql = `SELECT COUNT(*) as count FROM images WHERE SUBSTR(path, 1, 10) = ? AND path GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*'`;
+
+            const handleOffset = (exists) => {
+                if (!exists) {
+                    resolve(-1);
+                    return;
+                }
+
+                // 偏移量 = 日期前缀比目标日期大的图片数量（仅统计日期目录下的图片）
+                // 与 getImages 的 WHERE + ORDER BY 保持一致
+                const sql = `SELECT COUNT(*) as offset FROM images WHERE SUBSTR(path, 1, 10) > ? AND path GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*'`;
+
+                if (isBetterSQLite3) {
+                    try {
+                        const row = this.db.prepare(sql).get(date);
+                        resolve(row ? row.offset : 0);
+                    } catch (error) {
+                        reject(error);
+                    }
+                } else {
+                    this.db.get(sql, [date], (err, row) => {
+                        if (err) reject(err);
+                        else resolve(row ? row.offset : 0);
+                    });
+                }
+            };
+
             if (isBetterSQLite3) {
                 try {
-                    const row = this.db.prepare(sql).get(date);
-                    resolve(row ? row.offset : 0);
+                    const row = this.db.prepare(checkSql).get(date);
+                    handleOffset(row && row.count > 0);
                 } catch (error) {
                     reject(error);
                 }
             } else {
-                this.db.get(sql, [date], (err, row) => {
-                    if (err) reject(err);
-                    else resolve(row ? row.offset : 0);
+                this.db.get(checkSql, [date], (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        handleOffset(row && row.count > 0);
+                    }
                 });
             }
         });
@@ -550,11 +595,11 @@ class ImageDatabase {
         try {
             // 从 images 表中按日期分组统计
             const sql = `
-                SELECT 
+                SELECT
                     SUBSTR(path, 1, 10) as date,
                     COUNT(*) as count
                 FROM images
-                WHERE path LIKE '____-__-__/%'
+                WHERE path GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*'
                 GROUP BY SUBSTR(path, 1, 10)
                 ORDER BY date DESC
             `;
