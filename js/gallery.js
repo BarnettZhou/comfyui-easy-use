@@ -303,11 +303,65 @@ function closePreview() {
     document.body.style.overflow = '';
 }
 
-// 在新标签页打开图片
-function openInNewTab() {
+// 将当前图片设为模型封面
+async function setAsModelCover() {
     const previewImg = document.getElementById('previewImg');
-    if (previewImg && previewImg.src) {
-        window.open(previewImg.src, '_blank');
+    if (!previewImg || !previewImg.src) {
+        showToast('未找到当前图片', 'error');
+        return;
+    }
+
+    // 如果还没有加载过图片信息，先尝试加载
+    if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
+        try {
+            await parseImageInfo(previewImg.src);
+        } catch (e) {
+            console.error('预加载图片信息失败:', e);
+        }
+    }
+
+    if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
+        showToast('未能获取该图片使用的模型信息', 'error');
+        return;
+    }
+
+    // 从 ComfyUI view URL 解析 sourcePath
+    let sourcePath = '';
+    try {
+        const url = new URL(previewImg.src);
+        const filename = decodeURIComponent(url.searchParams.get('filename') || '');
+        const subfolder = decodeURIComponent(url.searchParams.get('subfolder') || '');
+        if (!filename) {
+            showToast('无法解析图片路径', 'error');
+            return;
+        }
+        sourcePath = subfolder ? `${subfolder}/${filename}` : filename;
+    } catch (e) {
+        showToast('无法解析图片路径', 'error');
+        return;
+    }
+
+    const modelName = currentPromptInfo.model;
+
+    try {
+        const response = await fetch('/api/set-model-cover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourcePath: sourcePath,
+                modelName: modelName
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(`已设为封面: ${data.coverName}`);
+        } else {
+            showToast(data.error || '设置封面失败', 'error');
+        }
+    } catch (error) {
+        console.error('设置封面失败:', error);
+        showToast('设置封面失败', 'error');
     }
 }
 

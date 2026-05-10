@@ -769,7 +769,105 @@ function toggleDrawer() {
 // 点击遮罩关闭抽屉
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('drawerOverlay').addEventListener('click', toggleDrawer);
+    document.getElementById('modelGalleryOverlay').addEventListener('click', toggleModelGalleryDrawer);
 });
+
+// ========== 模型画廊抽屉 ==========
+function toggleModelGalleryDrawer() {
+    const drawer = document.getElementById('modelGalleryDrawer');
+    const overlay = document.getElementById('modelGalleryOverlay');
+
+    drawer.classList.toggle('drawer-closed');
+
+    if (!drawer.classList.contains('drawer-closed')) {
+        overlay.classList.remove('hidden');
+        void overlay.offsetWidth;
+        overlay.classList.remove('opacity-0');
+        document.body.style.overflow = 'hidden';
+        renderModelGallery();
+    } else {
+        overlay.classList.add('opacity-0');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+        }, 300);
+        const historyDrawer = document.getElementById('drawer');
+        if (historyDrawer && historyDrawer.classList.contains('drawer-closed')) {
+            document.body.style.overflow = '';
+        }
+    }
+}
+
+// 渲染模型画廊
+function renderModelGallery() {
+    const list = document.getElementById('modelGalleryList');
+    const empty = document.getElementById('modelGalleryEmpty');
+
+    if (!config || !config.diffusion_models || config.diffusion_models.length === 0) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+    }
+
+    empty.classList.add('hidden');
+    list.innerHTML = '';
+
+    const selectedModel = document.getElementById('modelSelect').value;
+
+    config.diffusion_models.forEach(model => {
+        const modelValue = typeof model === 'string' ? model : model.value;
+        const modelText = typeof model === 'string' ? model : model.text;
+
+        const coverName = modelValue.replace(/\.safetensors$/i, '') + '.png';
+        const coverUrl = `../model-covers/${encodeURIComponent(coverName)}`;
+
+        const item = document.createElement('div');
+        item.className = 'flex flex-col gap-2 cursor-pointer group';
+        item.onclick = () => selectModelFromGallery(modelValue);
+
+        const isSelected = modelValue === selectedModel;
+        const ringClass = isSelected ? 'ring-2 ring-purple-500 ring-offset-2 dark:ring-offset-slate-800' : '';
+
+        const imgContainer = document.createElement('div');
+        imgContainer.className = `aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 relative ${ringClass} transition-all group-hover:ring-2 group-hover:ring-purple-400 group-hover:ring-offset-2 dark:group-hover:ring-offset-slate-800`;
+
+        const img = document.createElement('img');
+        img.src = coverUrl;
+        img.loading = 'lazy';
+        img.className = 'w-full h-full object-cover';
+        img.onerror = function() {
+            this.style.display = 'none';
+            const placeholder = document.createElement('div');
+            placeholder.className = 'absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500';
+            placeholder.innerHTML = `
+                <svg class="w-8 h-8 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-xs">暂无封面</span>
+            `;
+            imgContainer.appendChild(placeholder);
+        };
+
+        imgContainer.appendChild(img);
+        item.appendChild(imgContainer);
+
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'text-xs text-slate-600 dark:text-slate-400 text-center truncate px-1';
+        nameLabel.textContent = modelText;
+        item.appendChild(nameLabel);
+
+        list.appendChild(item);
+    });
+}
+
+// 从画廊选中模型
+function selectModelFromGallery(modelValue) {
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.value = modelValue;
+    toggleModelGalleryDrawer();
+    const modelItem = config.diffusion_models.find(m => (typeof m === 'string' ? m : m.value) === modelValue);
+    const displayText = modelItem ? (typeof modelItem === 'string' ? modelItem : modelItem.text) : modelValue;
+    showToast('已选中: ' + displayText);
+}
 
 // 请求 Comfyui 服务，清空历史记录
 async function clearHistory() {
@@ -818,9 +916,65 @@ function stopHistoryPolling() {
     }
 }
 
-function openInNewTab() {
-    const imgUrl = document.getElementById('previewImg').src;
-    window.open(imgUrl, '_blank');
+async function setAsModelCover() {
+    const previewImg = document.getElementById('previewImg');
+    if (!previewImg || !previewImg.src) {
+        showToast('未找到当前图片');
+        return;
+    }
+
+    // 如果还没有加载过图片信息，先尝试加载
+    if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
+        try {
+            await parseImageInfo(previewImg.src);
+        } catch (e) {
+            console.error('预加载图片信息失败:', e);
+        }
+    }
+
+    if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
+        showToast('未能获取该图片使用的模型信息');
+        return;
+    }
+
+    // 从 ComfyUI view URL 解析 sourcePath
+    let sourcePath = '';
+    try {
+        const url = new URL(previewImg.src);
+        const filename = decodeURIComponent(url.searchParams.get('filename') || '');
+        const subfolder = decodeURIComponent(url.searchParams.get('subfolder') || '');
+        if (!filename) {
+            showToast('无法解析图片路径');
+            return;
+        }
+        sourcePath = subfolder ? `${subfolder}/${filename}` : filename;
+    } catch (e) {
+        showToast('无法解析图片路径');
+        return;
+    }
+
+    const modelName = currentPromptInfo.model;
+
+    try {
+        const response = await fetch('/api/set-model-cover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourcePath: sourcePath,
+                modelName: modelName
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(`已设为封面: ${data.coverName}`);
+        } else {
+            showToast(data.error || '设置封面失败');
+        }
+    } catch (error) {
+        console.error('设置封面失败:', error);
+        showToast('设置封面失败');
+    }
 }
 
 // 发送到控制台功能

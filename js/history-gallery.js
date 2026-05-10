@@ -533,11 +533,50 @@ function updateNavButtons() {
 }
 
 /**
- * 在新标签页打开图片
+ * 将当前图片设为模型封面
  */
-function openInNewTab() {
-    if (currentPreviewIndex >= 0 && currentPreviewIndex < currentImages.length) {
-        window.open(currentImages[currentPreviewIndex].fullPath, '_blank');
+async function setAsModelCover() {
+    const file = currentImages[currentPreviewIndex];
+    if (!file) {
+        showToast('未找到当前图片', 'error');
+        return;
+    }
+
+    // 如果还没有加载过图片信息，先尝试加载
+    if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
+        try {
+            await parseImageInfo(file.fullPath);
+        } catch (e) {
+            console.error('预加载图片信息失败:', e);
+        }
+    }
+
+    if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
+        showToast('未能获取该图片使用的模型信息', 'error');
+        return;
+    }
+    
+    const modelName = currentPromptInfo.model;
+    
+    try {
+        const response = await fetch('/api/set-model-cover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sourcePath: file.path,
+                modelName: modelName
+            })
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast(`已设为封面: ${data.coverName}`);
+        } else {
+            showToast(data.error || '设置封面失败', 'error');
+        }
+    } catch (error) {
+        console.error('设置封面失败:', error);
+        showToast('设置封面失败', 'error');
     }
 }
 

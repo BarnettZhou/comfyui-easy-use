@@ -518,6 +518,59 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 设置模型封面
+    if (req.url === '/api/set-model-cover' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { sourcePath, modelName } = JSON.parse(body);
+                if (!sourcePath || !modelName) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '缺少参数' }), 'utf-8');
+                    return;
+                }
+                
+                // 防止路径遍历
+                if (sourcePath.includes('..')) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '无效的路径' }), 'utf-8');
+                    return;
+                }
+                
+                // ComfyUI 返回的 subfolder 可能已包含 easy-use/ 前缀，需要兼容处理
+                let normalizedSourcePath = sourcePath;
+                if (normalizedSourcePath.startsWith('easy-use/') || normalizedSourcePath.startsWith('easy-use\\')) {
+                    normalizedSourcePath = normalizedSourcePath.slice('easy-use/'.length);
+                }
+                const sourceFullPath = path.join(__dirname, '..', 'easy-use', normalizedSourcePath);
+                if (!fs.existsSync(sourceFullPath) || !fs.statSync(sourceFullPath).isFile()) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '源文件不存在' }), 'utf-8');
+                    return;
+                }
+                
+                const coverDir = path.join(__dirname, 'model-covers');
+                if (!fs.existsSync(coverDir)) {
+                    fs.mkdirSync(coverDir, { recursive: true });
+                }
+                
+                const coverName = modelName.replace(/\.safetensors$/i, '') + '.png';
+                const targetFullPath = path.join(coverDir, coverName);
+                
+                fs.copyFileSync(sourceFullPath, targetFullPath);
+                
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, coverName }), 'utf-8');
+            } catch (error) {
+                console.error('[API] 设置模型封面失败:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '设置封面失败' }), 'utf-8');
+            }
+        });
+        return;
+    }
+
     // 处理文件路径
     let filePath = routes[req.url] || req.url;
     filePath = path.join(__dirname, filePath);
