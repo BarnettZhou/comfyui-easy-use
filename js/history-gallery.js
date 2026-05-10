@@ -1,22 +1,9 @@
 /**
- * 文件浏览器 - 浏览 easy-use 目录下的文件和文件夹
- * 支持两种视图模式：目录浏览模式 / 无限浏览模式
+ * 文件浏览器 - 浏览 easy-use 目录下的文件
+ * 只保留无限浏览模式，通过 switch 切换"日期导航"和"目录导航"
  */
 
 // ==================== 全局状态 ====================
-
-// 目录浏览模式状态
-let currentPath = ''; // 当前目录路径（相对于 easy-use）
-let currentImages = []; // 当前目录下的图片列表
-let currentPreviewIndex = -1; // 当前预览的图片索引
-let currentPromptInfo = null; // 当前图片的 prompt 信息
-let isInfoPopupOpen = false; // 信息弹窗是否打开
-let isFolderSectionCollapsed = false; // 目录区域是否收起
-let currentWorkflowText = null; // 当前图片的原始工作流 JSON
-let currentImageExtraInfo = { folder: '-', time: '-' }; // 当前图片的额外信息（目录、时间）
-
-// 视图模式状态
-let currentViewMode = 'folder'; // 'folder' | 'infinite'
 
 // 无限浏览模式状态
 let infiniteImages = []; // 无限浏览的所有图片
@@ -26,305 +13,322 @@ let isInfiniteLoading = false; // 是否正在加载
 let hasMoreInfiniteImages = true; // 是否还有更多图片
 let infiniteScrollObserver = null; // 无限滚动观察器
 let infiniteTotalCount = 0; // 图片总数
-let baseOffset = 0; // 当前 infiniteImages[0] 对应的真实列表偏移量（支持从任意位置跳转加载）
+let baseOffset = 0; // 当前 infiniteImages[0] 对应的真实列表偏移量
 
-/**
- * 切换目录区域的展开/收起状态
- */
-function toggleFolderSection() {
-    const folderGrid = document.getElementById('folderGrid');
-    const folderEmptyState = document.getElementById('folderEmptyState');
-    const toggleIcon = document.getElementById('folderToggleIcon');
-    
-    isFolderSectionCollapsed = !isFolderSectionCollapsed;
-    
-    if (isFolderSectionCollapsed) {
-        // 收起
-        folderGrid.classList.add('hidden');
-        folderEmptyState.classList.add('hidden');
-        toggleIcon.style.transform = 'rotate(-90deg)';
-    } else {
-        // 展开
-        folderGrid.classList.remove('hidden');
-        // 只有在有目录时才显示空状态
-        const folderCount = document.getElementById('folderCount').textContent;
-        if (folderCount === '0 个目录' || folderCount === '加载中...') {
-            folderEmptyState.classList.remove('hidden');
-        }
-        toggleIcon.style.transform = 'rotate(0deg)';
-    }
-}
+// 预览状态
+let currentPreviewIndex = -1; // 当前预览的图片索引
+let currentImages = []; // 当前预览使用的图片列表
+let currentPromptInfo = null; // 当前图片的 prompt 信息
+let isInfoPopupOpen = false; // 信息弹窗是否打开
+let currentWorkflowText = null; // 当前图片的原始工作流 JSON
+let currentImageExtraInfo = { folder: '-', time: '-' }; // 当前图片的额外信息
 
-// 初始化
-document.addEventListener('DOMContentLoaded', async () => {
-    // 先加载配置
-    await initServerConfig();
-    
-    // 初始化视图模式
-    initViewMode();
-    
-    // 同时加载根目录的目录结构和图片
-    Promise.all([
-        loadStructure(),
-        loadRootImages()
-    ]);
+// 目录筛选状态
+let folderFilterEnabled = false; // 是否开启目录筛选
+let currentFilterFolder = null; // 当前选中的目录
+let savedInfiniteScrollY = 0; // 离开无限模式时保存的滚动位置
 
-    // 添加点击遮罩关闭预览功能
-    document.getElementById('fullPreview').addEventListener('click', function(event) {
-        // 检查点击的目标是否是遮罩本身（而不是里面的按钮或图片）
-        if (event.target === this) {
-            closePreview();
-        }
-    });
-    
-    // 初始化无限滚动
-    initInfiniteScroll();
-});
-
-/**
- * 加载目录结构
- * @param {string} dirPath - 目录路径，默认为空（根目录）
- */
-async function loadStructure(dirPath = '') {
-    try {
-        showLoading(true);
-        const url = dirPath ? `/api/easy-use/structure/${dirPath}` : '/api/easy-use/structure/';
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('获取目录结构失败');
-        
-        const data = await response.json();
-        renderStructure(data.structure);
-    } catch (error) {
-        console.error('加载目录结构失败:', error);
-        showToast('加载目录结构失败', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-/**
- * 渲染目录结构
- * @param {Array} structure - 目录结构数组
- */
-function renderStructure(structure) {
-    const folderGrid = document.getElementById('folderGrid');
-    const folderEmptyState = document.getElementById('folderEmptyState');
-    const folderCount = document.getElementById('folderCount');
-    
-    // 过滤出目录
-    const folders = structure.filter(item => item.type === 'directory');
-    
-    // 更新目录计数
-    folderCount.textContent = `${folders.length} 个目录`;
-    
-    if (folders.length === 0) {
-        folderGrid.innerHTML = '';
-        folderEmptyState.classList.remove('hidden');
-        return;
-    }
-    
-    folderEmptyState.classList.add('hidden');
-    
-    // 渲染目录列表 - 响应式网格布局
-    folderGrid.innerHTML = `
-        <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-            ${folders.map(folder => `
-                <div class="folder-chip cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-200 dark:hover:border-primary-800 transition-all duration-200 group"
-                     onclick="navigateToFolder('${folder.path}')">
-                    <svg class="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                    </svg>
-                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300 truncate" title="${folder.name}">${folder.name}</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-
-
-/**
- * 导航到指定目录
- * @param {string} folderPath - 目录路径
- */
-async function navigateToFolder(folderPath) {
-    currentPath = folderPath;
-    updateBreadcrumb();
-    
-    // 始终显示目录区域和图片区域
-    document.getElementById('folderSection').classList.remove('hidden');
-    
-    // 同时加载子目录和图片
-    await Promise.all([
-        loadStructure(folderPath),
-        loadImages(folderPath)
-    ]);
-}
-
-/**
- * 返回根目录
- */
-function navigateToRoot() {
-    currentPath = '';
-    currentImages = [];
-    currentPreviewIndex = -1;
-    
-    // 显示目录区域
-    document.getElementById('folderSection').classList.remove('hidden');
-    
-    updateBreadcrumb();
-    loadStructure();
-    loadRootImages();
-}
-
-/**
- * 加载根目录下的图片
- */
-async function loadRootImages() {
-    try {
-        showLoading(true);
-        const response = await fetch('/api/easy-use/images/');
-        if (!response.ok) throw new Error('获取图片列表失败');
-        
-        const data = await response.json();
-        renderImages(data.files);
-    } catch (error) {
-        console.error('加载图片失败:', error);
-        showToast('加载图片失败', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-/**
- * 更新面包屑导航
- */
-function updateBreadcrumb() {
-    const container = document.getElementById('breadcrumbContainer');
-    
-    if (!currentPath) {
-        container.innerHTML = '';
-        return;
-    }
-    
-    const parts = currentPath.split('/');
-    let html = '';
-    let accumulatedPath = '';
-    
-    parts.forEach((part, index) => {
-        accumulatedPath = accumulatedPath ? `${accumulatedPath}/${part}` : part;
-        const isLast = index === parts.length - 1;
-        
-        if (isLast) {
-            html += `<span class="breadcrumb-item font-medium text-slate-800 dark:text-slate-200">${part}</span>`;
-        } else {
-            html += `<span class="breadcrumb-item"><button onclick="navigateToFolder('${accumulatedPath}')" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">${part}</button></span>`;
-        }
-    });
-    
-    container.innerHTML = html;
-}
-
-/**
- * 加载指定目录下的图片
- * @param {string} dirPath - 目录路径
- */
-async function loadImages(dirPath) {
-    try {
-        showLoading(true);
-        const response = await fetch(`/api/easy-use/images/${dirPath}`);
-        if (!response.ok) throw new Error('获取图片列表失败');
-        
-        const data = await response.json();
-        renderImages(data.files);
-    } catch (error) {
-        console.error('加载图片失败:', error);
-        showToast('加载图片失败', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
+// 日期分组数据
+let dateGroups = []; // [{ date: '2026-02-14', count: 10, startIndex: 0 }, ...]
 
 // 全局图片懒加载观察器
 let imageLazyObserver = null;
 
-/**
- * 初始化图片懒加载观察器
- * 
- * 优化：使用较大的 rootMargin 同时实现"预加载"和"内存回收"
- * - 进入扩展视口时加载图片
- * - 离开扩展视口很远时释放图片内存（防止老旧设备内存耗尽）
- * - 不 unobserve，持续跟踪图片的可见性变化
- */
-function initImageLazyObserver() {
-    // 如果已存在，先断开
-    if (imageLazyObserver) {
-        imageLazyObserver.disconnect();
-    }
+// ==================== 初始化 ====================
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await initServerConfig();
     
-    imageLazyObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            const img = entry.target;
-            const card = img.parentElement;
-            const realSrc = img.getAttribute('data-src');
-            
-            if (entry.isIntersecting) {
-                // 进入扩展视口，加载真实图片
-                if (realSrc && (!img.src || img.src !== realSrc)) {
-                    img.src = realSrc;
-                }
-            } else {
-                // 离开扩展视口很远，释放图片内存
-                // 条件：图片已加载过，且当前 src 不是 data-src（避免误释放未加载的）
-                if (img.src && img.src !== realSrc && realSrc) {
-                    // 使用 removeAttribute 而非设置空字符串，避免触发 onerror
-                    img.removeAttribute('src');
-                    if (card && !card.classList.contains('img-skeleton')) {
-                        card.classList.add('img-skeleton');
-                    }
-                }
-            }
-        });
-    }, {
-        threshold: 0,
-        rootMargin: '500px 0px 500px 0px' // 上下各 500px 缓冲区
+    // 加载无限浏览数据
+    loadInfiniteImages();
+    loadDateNav();
+    
+    // 初始化无限滚动
+    initInfiniteScroll();
+    
+    // 点击遮罩关闭预览
+    document.getElementById('fullPreview').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closePreview();
+        }
     });
+});
+
+// ==================== 目录筛选功能 ====================
+
+/**
+ * 切换"查看目录"开关
+ */
+function toggleFolderFilter() {
+    folderFilterEnabled = !folderFilterEnabled;
+    
+    const switchTrack = document.getElementById('switchTrack');
+    const switchKnob = document.getElementById('switchKnob');
+    const switchText = document.getElementById('switchText');
+    const leftNavTitleText = document.getElementById('leftNavTitleText');
+    const mobileNavTitleText = document.getElementById('mobileNavTitleText');
+    const breadcrumbContainer = document.getElementById('breadcrumbContainer');
+    const breadcrumbText = document.getElementById('breadcrumbText');
+    const sectionTitle = document.getElementById('sectionTitle');
+    
+    if (folderFilterEnabled) {
+        // 开启目录筛选
+        if (switchTrack) {
+            switchTrack.classList.remove('bg-slate-200', 'dark:bg-slate-700');
+            switchTrack.classList.add('bg-primary-600');
+        }
+        if (switchKnob) {
+            switchKnob.classList.add('translate-x-3');
+        }
+        if (switchText) {
+            switchText.textContent = '查看目录';
+            switchText.classList.add('text-primary-600', 'dark:text-primary-400');
+            switchText.classList.remove('text-slate-500', 'dark:text-slate-400');
+        }
+        
+        // 切换导航标题
+        if (leftNavTitleText) leftNavTitleText.textContent = '目录导航';
+        if (mobileNavTitleText) mobileNavTitleText.textContent = '目录导航';
+        
+        // 加载目录列表到导航
+        loadFolderNav();
+        
+        // 如果已经有选中的目录，保持筛选状态
+        if (currentFilterFolder) {
+            filterByFolder(currentFilterFolder);
+        }
+    } else {
+        // 关闭目录筛选，恢复无限滚动
+        if (switchTrack) {
+            switchTrack.classList.add('bg-slate-200', 'dark:bg-slate-700');
+            switchTrack.classList.remove('bg-primary-600');
+        }
+        if (switchKnob) {
+            switchKnob.classList.remove('translate-x-3');
+        }
+        if (switchText) {
+            switchText.textContent = '查看目录';
+            switchText.classList.remove('text-primary-600', 'dark:text-primary-400');
+            switchText.classList.add('text-slate-500', 'dark:text-slate-400');
+        }
+        
+        // 恢复导航标题
+        if (leftNavTitleText) leftNavTitleText.textContent = '日期导航';
+        if (mobileNavTitleText) mobileNavTitleText.textContent = '日期导航';
+        
+        // 恢复日期导航
+        renderDateNav();
+        
+        // 返回全部图片
+        backToAllImages();
+    }
 }
 
 /**
- * 渲染图片列表
- * @param {Array} files - 图片文件数组
+ * 加载目录列表到左侧导航
  */
-function renderImages(files) {
-    const imageGrid = document.getElementById('imageGrid');
-    const imageEmptyState = document.getElementById('imageEmptyState');
-    const imageCount = document.getElementById('imageCount');
+async function loadFolderNav() {
+    try {
+        const response = await fetch('/api/easy-use/structure/');
+        if (!response.ok) throw new Error('获取目录结构失败');
+        
+        const data = await response.json();
+        const folders = (data.structure || []).filter(item => item.type === 'directory');
+        renderFolderNav(folders);
+        
+        // 如果处于目录筛选模式且没有选中目录，自动选择最新（第一个）目录
+        if (folderFilterEnabled && !currentFilterFolder && folders.length > 0) {
+            filterByFolder(folders[0].path);
+        }
+    } catch (error) {
+        console.error('加载目录列表失败:', error);
+    }
+}
+
+/**
+ * 渲染目录导航
+ * @param {Array} folders - 目录数组
+ */
+function renderFolderNav(folders) {
+    const navContainer = document.getElementById('infiniteDateNav');
+    const mobileNavContainer = document.getElementById('mobileDateNav');
     
-    currentImages = files.map(file => ({
-        ...file,
-        fullPath: `/api/easy-use/files/${file.path}`
-    }));
+    // 按目录名称倒序排列（最新日期在前）
+    folders.sort((a, b) => b.name.localeCompare(a.name));
     
-    // 更新图片计数
-    imageCount.textContent = `${files.length} 张图片`;
-    
-    if (files.length === 0) {
-        imageGrid.innerHTML = '';
-        imageEmptyState.classList.remove('hidden');
+    if (folders.length === 0) {
+        const emptyHtml = `
+            <div class="text-center py-8">
+                <p class="text-slate-400 dark:text-slate-500 text-sm">暂无目录</p>
+            </div>
+        `;
+        if (navContainer) navContainer.innerHTML = emptyHtml;
+        if (mobileNavContainer) mobileNavContainer.innerHTML = emptyHtml;
         return;
     }
     
-    imageEmptyState.classList.add('hidden');
+    const html = folders.map(folder => {
+        const isActive = currentFilterFolder === folder.path;
+        return `
+            <button onclick="filterByFolder('${folder.path}'); closeMobileDateNav();"
+                    class="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group flex items-center justify-between ${isActive ? 'date-nav-active' : ''}">
+                <div class="flex items-center gap-2 min-w-0">
+                    <svg class="w-4 h-4 text-primary-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors truncate">
+                        ${folder.name}
+                    </span>
+                </div>
+                <svg class="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        `;
+    }).join('');
+    
+    if (navContainer) navContainer.innerHTML = html;
+    if (mobileNavContainer) mobileNavContainer.innerHTML = html;
+}
+
+/**
+ * 按目录筛选图片
+ * @param {string} folderPath - 目录路径
+ */
+async function filterByFolder(folderPath) {
+    try {
+        // 保存无限模式下的滚动位置，以便切回时恢复
+        if (!folderFilterEnabled) {
+            savedInfiniteScrollY = window.scrollY;
+        }
+        
+        showLoading(true);
+        
+        const response = await fetch(`/api/easy-use/images/${folderPath}`);
+        if (!response.ok) throw new Error('获取图片列表失败');
+        
+        const data = await response.json();
+        const files = data.files || [];
+        
+        currentFilterFolder = folderPath;
+        
+        // 设置当前图片列表（用于预览导航）
+        currentImages = files.map(file => ({
+            ...file,
+            fullPath: `/api/easy-use/files/${file.path}`
+        }));
+        
+        // 更新面包屑
+        const breadcrumbContainer = document.getElementById('breadcrumbContainer');
+        const breadcrumbText = document.getElementById('breadcrumbText');
+        const sectionTitle = document.getElementById('sectionTitle');
+        
+        if (breadcrumbContainer) breadcrumbContainer.classList.remove('hidden');
+        if (breadcrumbText) breadcrumbText.textContent = folderPath;
+        if (sectionTitle) sectionTitle.textContent = folderPath;
+        
+        // 禁用无限滚动
+        if (infiniteScrollObserver) {
+            infiniteScrollObserver.disconnect();
+        }
+        
+        // 渲染筛选后的图片
+        renderFilteredImages(files);
+        
+        // 更新总数显示
+        const totalCountEl = document.getElementById('infiniteTotalCount');
+        if (totalCountEl) totalCountEl.textContent = `${files.length} 张`;
+        
+        // 隐藏加载器和结束消息
+        document.getElementById('infiniteScrollTrigger').classList.add('hidden');
+        document.getElementById('infiniteEndMessage').classList.add('hidden');
+        
+        // 重新渲染目录导航以更新高亮
+        loadFolderNav();
+        
+    } catch (error) {
+        console.error('筛选目录图片失败:', error);
+        showToast('加载目录图片失败', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+/**
+ * 返回全部图片（无限滚动模式）
+ */
+function backToAllImages() {
+    currentFilterFolder = null;
+    currentImages = [];
+    
+    // 恢复面包屑
+    const breadcrumbContainer = document.getElementById('breadcrumbContainer');
+    const sectionTitle = document.getElementById('sectionTitle');
+    
+    if (breadcrumbContainer) breadcrumbContainer.classList.add('hidden');
+    if (sectionTitle) sectionTitle.textContent = '全部图片';
+    
+    // 恢复无限滚动
+    const trigger = document.getElementById('infiniteScrollTrigger');
+    if (trigger && infiniteScrollObserver) {
+        infiniteScrollObserver.observe(trigger);
+    }
+    
+    // 重置并恢复无限浏览
+    document.getElementById('infiniteImageGrid').innerHTML = '';
+    
+    // 重新渲染已加载的无限浏览图片
+    if (infiniteImages.length > 0) {
+        renderInfiniteImages(infiniteImages, true);
+    }
+    
+    // 恢复总数显示
+    if (infiniteTotalCount > 0) {
+        document.getElementById('infiniteTotalCount').textContent = `共 ${infiniteTotalCount} 张`;
+    }
+    
+    // 如果还有更多图片，显示加载触发器
+    if (hasMoreInfiniteImages) {
+        document.getElementById('infiniteScrollTrigger').classList.remove('hidden');
+    }
+    
+    // 如果没有图片且未加载过，重新加载
+    if (infiniteImages.length === 0 && !isInfiniteLoading) {
+        loadInfiniteImages();
+    }
+    
+    // 恢复之前的滚动位置，避免跳回最近日期
+    if (savedInfiniteScrollY > 0) {
+        requestAnimationFrame(() => {
+            window.scrollTo(0, savedInfiniteScrollY);
+        });
+    }
+}
+
+/**
+ * 渲染筛选后的图片（目录筛选模式）
+ * @param {Array} files - 图片文件数组
+ */
+function renderFilteredImages(files) {
+    const grid = document.getElementById('infiniteImageGrid');
+    const emptyState = document.getElementById('infiniteEmptyState');
+    
+    grid.innerHTML = '';
+    
+    if (files.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    emptyState.classList.add('hidden');
     
     // 初始化懒加载观察器
     initImageLazyObserver();
     
-    // 清空并渲染图片卡片（使用 DOM 创建而非 innerHTML，便于绑定事件和优化性能）
-    imageGrid.innerHTML = '';
     const fragment = document.createDocumentFragment();
+    
     files.forEach((file, index) => {
         const card = document.createElement('div');
-        // 移除了 card-hover（含 translateY transform），老旧 iPad 上大量 GPU 合成层会卡死
         card.className = 'group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 img-skeleton hover:border-primary-300 dark:hover:border-primary-700 transition-colors duration-200';
         card.onclick = () => openPreview(index);
         
@@ -337,7 +341,6 @@ function renderImages(files) {
             card.classList.remove('img-skeleton');
         };
         img.onerror = function() {
-            // removeAttribute('src') 不会触发 onerror，但如果其他原因触发了，检查 src 是否存在
             if (!img.getAttribute('src')) return;
             card.classList.remove('img-skeleton');
             card.innerHTML = '<div class="w-full h-full flex items-center justify-center text-slate-400"><span class="text-xs">加载失败</span></div>';
@@ -348,7 +351,7 @@ function renderImages(files) {
         overlay.innerHTML = `
             <div class="absolute bottom-0 left-0 right-0 p-3">
                 <p class="text-white text-xs truncate">${file.name}</p>
-                <p class="text-white/70 text-xs">${formatFileSize(file.size)} · ${formatDate(file.mtime)}</p>
+                <p class="text-white/70 text-xs">${formatFileSize(file.size)} \u00b7 ${formatDate(file.mtime)}</p>
             </div>
         `;
         
@@ -356,70 +359,97 @@ function renderImages(files) {
         card.appendChild(overlay);
         fragment.appendChild(card);
     });
-    imageGrid.appendChild(fragment);
+    
+    grid.appendChild(fragment);
     
     // 为所有懒加载图片添加观察
-    const lazyImages = imageGrid.querySelectorAll('.lazy-image');
+    const lazyImages = grid.querySelectorAll('.lazy-image');
     lazyImages.forEach(img => {
-        imageLazyObserver.observe(img);
+        if (imageLazyObserver) {
+            imageLazyObserver.observe(img);
+        }
     });
 }
+
+
+// ==================== 图片懒加载 ====================
+
+/**
+ * 初始化图片懒加载观察器
+ */
+function initImageLazyObserver() {
+    if (imageLazyObserver) {
+        imageLazyObserver.disconnect();
+    }
+    
+    imageLazyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const img = entry.target;
+            const card = img.parentElement;
+            const realSrc = img.getAttribute('data-src');
+            
+            if (entry.isIntersecting) {
+                if (realSrc && (!img.src || img.src !== realSrc)) {
+                    img.src = realSrc;
+                }
+            } else {
+                if (img.src && img.src !== realSrc && realSrc) {
+                    img.removeAttribute('src');
+                    if (card && !card.classList.contains('img-skeleton')) {
+                        card.classList.add('img-skeleton');
+                    }
+                }
+            }
+        });
+    }, {
+        threshold: 0,
+        rootMargin: '500px 0px 500px 0px'
+    });
+}
+
+// ==================== 刷新 ====================
 
 /**
  * 刷新当前视图
  */
 async function refreshCurrentView() {
-    // 根据当前视图模式决定刷新哪个视图
-    if (currentViewMode === 'infinite') {
-        await refreshInfiniteView();
+    if (folderFilterEnabled && currentFilterFolder) {
+        await filterByFolder(currentFilterFolder);
         showToast('刷新成功');
         return;
     }
     
-    // 目录浏览模式刷新
-    if (currentPath) {
-        await Promise.all([
-            loadStructure(currentPath),
-            loadImages(currentPath)
-        ]);
-    } else {
-        await Promise.all([
-            loadStructure(),
-            loadRootImages()
-        ]);
-    }
+    await refreshInfiniteView();
     showToast('刷新成功');
 }
 
+// ==================== 预览 ====================
+
 /**
- * 打开全屏预览
+ * 打开全屏预览（通用，用于目录筛选模式）
  * @param {number} index - 图片索引
  */
-async function openPreview(index) {
+function openPreview(index) {
     currentPreviewIndex = index;
     const preview = document.getElementById('fullPreview');
     const img = document.getElementById('previewImg');
     const file = currentImages[index];
     
+    if (!file) return;
+    
     img.src = file.fullPath;
     preview.classList.remove('hidden');
-    
-    // 禁止背景滚动
     document.body.style.overflow = 'hidden';
     
-    // 更新导航按钮状态
     updateNavButtons();
     
-    // 设置当前图片额外信息
     currentImageExtraInfo = {
         folder: extractFolderFromPath(file.path),
         time: formatPopupTime(file.mtime)
     };
     
-    // 预解析图片信息（但不显示）
-    await preloadImageInfo(file.fullPath);
-    // 预加载工作流
-    await preloadWorkflowInfo(file.fullPath);
+    preloadImageInfo(file.fullPath);
+    preloadWorkflowInfo(file.fullPath);
 }
 
 /**
@@ -429,11 +459,7 @@ function closePreview() {
     const preview = document.getElementById('fullPreview');
     preview.classList.add('hidden');
     document.getElementById('previewImg').src = '';
-    
-    // 关闭信息弹窗（如果打开）
     closeInfoPopup();
-    
-    // 恢复背景滚动
     document.body.style.overflow = '';
     currentPreviewIndex = -1;
     currentPromptInfo = null;
@@ -449,11 +475,8 @@ async function prevImage(event) {
         currentPreviewIndex--;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
         updateNavButtons();
-        // 预加载新图片信息
         await preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
-        // 预加载工作流
         await preloadWorkflowInfo(currentImages[currentPreviewIndex].fullPath);
-        // 如果弹窗已打开，更新显示
         if (isInfoPopupOpen) {
             resetPopupInfo();
             const file = currentImages[currentPreviewIndex];
@@ -477,10 +500,9 @@ async function nextImage(event) {
     
     // 如果当前是最后一张且在无限浏览模式下，尝试加载更多
     if (currentPreviewIndex >= currentImages.length - 1) {
-        if (currentViewMode === 'infinite' && hasMoreInfiniteImages && !isInfiniteLoading) {
+        if (!folderFilterEnabled && hasMoreInfiniteImages && !isInfiniteLoading) {
             console.log('[预览] 到达当前队列末尾，加载更多图片...');
             await loadInfiniteImages();
-            // 加载完成后，currentImages 引用会更新（infiniteImages 已添加新数据）
         }
     }
     
@@ -488,11 +510,8 @@ async function nextImage(event) {
         currentPreviewIndex++;
         document.getElementById('previewImg').src = currentImages[currentPreviewIndex].fullPath;
         updateNavButtons();
-        // 预加载新图片信息
         await preloadImageInfo(currentImages[currentPreviewIndex].fullPath);
-        // 预加载工作流
         await preloadWorkflowInfo(currentImages[currentPreviewIndex].fullPath);
-        // 如果弹窗已打开，更新显示
         if (isInfoPopupOpen) {
             resetPopupInfo();
             const file = currentImages[currentPreviewIndex];
@@ -517,20 +536,19 @@ function updateNavButtons() {
     prevBtn.style.opacity = currentPreviewIndex === 0 ? '0.3' : '0.7';
     prevBtn.style.cursor = currentPreviewIndex === 0 ? 'not-allowed' : 'pointer';
     
-    // 下一张按钮状态
     const isLastImage = currentPreviewIndex === currentImages.length - 1;
-    const canLoadMore = currentViewMode === 'infinite' && hasMoreInfiniteImages;
+    const canLoadMore = !folderFilterEnabled && hasMoreInfiniteImages;
     
     if (isLastImage && canLoadMore) {
-        // 无限浏览模式下还有更多图片可加载，显示可点击状态
         nextBtn.style.opacity = '0.7';
         nextBtn.style.cursor = 'pointer';
     } else {
-        // 普通状态或没有更多图片
         nextBtn.style.opacity = isLastImage ? '0.3' : '0.7';
         nextBtn.style.cursor = isLastImage ? 'not-allowed' : 'pointer';
     }
 }
+
+// ==================== 模型封面 ====================
 
 /**
  * 将当前图片设为模型封面
@@ -542,7 +560,6 @@ async function setAsModelCover() {
         return;
     }
 
-    // 如果还没有加载过图片信息，先尝试加载
     if (!currentPromptInfo || !currentPromptInfo.model || currentPromptInfo.model === '-') {
         try {
             await parseImageInfo(file.fullPath);
@@ -589,8 +606,6 @@ async function preloadImageInfo(imageUrl) {
         const response = await fetch(imageUrl);
         const arrayBuffer = await response.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        
-        // 解析 PNG 获取 prompt 信息
         const promptData = extractPromptFromPNG(uint8Array);
         
         if (promptData) {
@@ -610,8 +625,6 @@ async function preloadWorkflowInfo(imageUrl) {
         const response = await fetch(imageUrl);
         const arrayBuffer = await response.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        
-        // 解析 PNG 获取 prompt 信息（同时获取原始工作流 JSON）
         const promptData = extractPromptFromPNG(uint8Array);
         
         if (promptData && promptData._raw) {
@@ -621,6 +634,8 @@ async function preloadWorkflowInfo(imageUrl) {
         console.error('预加载工作流失败:', error);
     }
 }
+
+// ==================== 信息弹窗 ====================
 
 /**
  * 切换信息弹窗显示
@@ -644,13 +659,11 @@ function openInfoPopup() {
     popup.classList.remove('hidden');
     isInfoPopupOpen = true;
     
-    // 显示动画
     setTimeout(() => {
         overlay.classList.remove('opacity-0');
         content.classList.add('show');
     }, 10);
     
-    // 重置并加载信息
     resetPopupInfo();
     if (currentImages[currentPreviewIndex]) {
         parseImageInfo(currentImages[currentPreviewIndex].fullPath);
@@ -692,8 +705,6 @@ async function parseImageInfo(imageUrl) {
         const response = await fetch(imageUrl);
         const arrayBuffer = await response.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        
-        // 解析 PNG 获取 prompt 信息
         const promptData = extractPromptFromPNG(uint8Array);
         
         if (promptData) {
@@ -722,7 +733,7 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoScheduler').textContent = info.scheduler;
     document.getElementById('popupInfoSteps').textContent = info.steps;
     document.getElementById('popupInfoCfg').textContent = info.cfg;
-    // VAE名称映射
+    
     let displayVae = info.vae;
     if (config && config.vae_models && info.vae && info.vae !== '-') {
         const vaeItem = config.vae_models.find(v => v.value === info.vae);
@@ -731,7 +742,6 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoVae').textContent = displayVae;
     document.getElementById('popupInfoVae').title = info.vae;
 
-    // 模型名称映射
     let displayModel = info.model;
     if (config && config.diffusion_models && info.model && info.model !== '-') {
         const modelItem = config.diffusion_models.find(m => m.value === info.model);
@@ -743,7 +753,6 @@ function displayPopupInfo(info) {
     document.getElementById('popupInfoSeed').title = info.seed;
     document.getElementById('popupInfoPrompt').textContent = info.prompt || '无提示词';
     
-    // 额外信息：所在目录、生成时间
     document.getElementById('popupInfoFolder').textContent = currentImageExtraInfo.folder;
     document.getElementById('popupInfoFolder').title = currentImageExtraInfo.folder;
     document.getElementById('popupInfoTime').textContent = currentImageExtraInfo.time;
@@ -756,10 +765,11 @@ function showEmptyPopupInfo() {
     document.getElementById('popupInfoLoading').classList.add('hidden');
     document.getElementById('popupInfoContent').classList.add('hidden');
     document.getElementById('popupInfoEmpty').classList.remove('hidden');
-    // 即使 PNG 没有元数据，也显示文件信息
     document.getElementById('popupInfoFolder').textContent = currentImageExtraInfo.folder;
     document.getElementById('popupInfoTime').textContent = currentImageExtraInfo.time;
 }
+
+// ==================== 复制 ====================
 
 /**
  * 复制文本到剪贴板（兼容移动端）
@@ -769,7 +779,6 @@ function showEmptyPopupInfo() {
 async function copyToClipboard(text) {
     if (!text) return false;
 
-    // 尝试使用现代 Clipboard API
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(text);
@@ -779,7 +788,6 @@ async function copyToClipboard(text) {
         }
     }
 
-    // 降级方案：使用 execCommand
     try {
         const textArea = document.createElement('textarea');
         textArea.value = text;
@@ -830,6 +838,8 @@ async function copyWorkflow() {
     }
 }
 
+// ==================== 加载状态 ====================
+
 /**
  * 显示/隐藏加载状态
  * @param {boolean} show - 是否显示
@@ -847,6 +857,8 @@ function showLoading(show) {
     }
 }
 
+// ==================== Toast ====================
+
 /**
  * 显示 Toast 通知
  * @param {string} message - 消息内容
@@ -859,7 +871,6 @@ function showToast(message, type = 'success') {
     
     toastMessage.textContent = message;
     
-    // 设置图标
     if (type === 'error') {
         toastIcon.innerHTML = `<svg class="w-4 h-4 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
         toastIcon.className = 'w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center flex-shrink-0';
@@ -868,16 +879,16 @@ function showToast(message, type = 'success') {
         toastIcon.className = 'w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0';
     }
     
-    // 显示
     toast.classList.remove('translate-x-full', 'opacity-0');
     toast.classList.add('translate-x-0', 'opacity-100');
     
-    // 3秒后隐藏
     setTimeout(() => {
         toast.classList.add('translate-x-full', 'opacity-0');
         toast.classList.remove('translate-x-0', 'opacity-100');
     }, 3000);
 }
+
+// ==================== 格式化 ====================
 
 /**
  * 格式化文件大小
@@ -941,12 +952,12 @@ function extractFolderFromPath(path) {
     return parts.length > 1 ? parts[parts.length - 2] : '-';
 }
 
-// 键盘快捷键
+// ==================== 键盘快捷键 ====================
+
 document.addEventListener('keydown', (e) => {
     const preview = document.getElementById('fullPreview');
     if (preview.classList.contains('hidden')) return;
     
-    // 如果弹窗打开，ESC 先关闭弹窗
     if (isInfoPopupOpen && e.key === 'Escape') {
         closeInfoPopup();
         return;
@@ -976,126 +987,17 @@ document.addEventListener('keydown', (e) => {
             }
             break;
         case 'ArrowRight':
-            // 使用 nextImage 函数，支持自动加载更多
             nextImage(null);
             break;
         case 'i':
         case 'I':
-            // I 键切换信息弹窗
             toggleInfoPopup();
-            break;
-        case 'v':
-        case 'V':
-            // V 键切换视图模式
-            toggleViewMode();
             break;
     }
 });
 
 
-// ==================== 视图切换功能 ====================
-
-/**
- * 初始化视图模式
- */
-function initViewMode() {
-    const savedMode = localStorage.getItem('viewMode');
-    if (savedMode === 'infinite') {
-        // 如果有保存的无限模式偏好，切换到无限模式
-        // 注意：这里不调用 switchToInfiniteMode 避免加载数据
-        // 只更新状态和UI，数据在用户实际需要时再加载
-        currentViewMode = 'infinite';
-        
-        // 切换容器显示
-        document.getElementById('folderViewContainer').classList.add('hidden');
-        document.getElementById('infiniteViewContainer').classList.remove('hidden');
-        document.getElementById('breadcrumbContainer').closest('div').classList.add('hidden');
-        
-        // 加载无限浏览数据
-        if (infiniteImages.length === 0 && !isInfiniteLoading) {
-            loadInfiniteImages();
-        }
-    }
-    updateViewToggleUI();
-}
-
-/**
- * 切换视图模式
- */
-function toggleViewMode() {
-    if (currentViewMode === 'folder') {
-        switchToInfiniteMode();
-    } else {
-        switchToFolderMode();
-    }
-}
-
-/**
- * 切换到目录浏览模式
- */
-function switchToFolderMode() {
-    currentViewMode = 'folder';
-    localStorage.setItem('viewMode', 'folder');
-    
-    // 隐藏无限浏览容器，显示目录浏览容器
-    document.getElementById('infiniteViewContainer').classList.add('hidden');
-    document.getElementById('folderViewContainer').classList.remove('hidden');
-    
-    // 恢复面包屑显示
-    document.getElementById('breadcrumbContainer').closest('div').classList.remove('hidden');
-    
-    updateViewToggleUI();
-    showToast('已切换到目录浏览模式');
-}
-
-/**
- * 切换到无限浏览模式
- */
-async function switchToInfiniteMode() {
-    currentViewMode = 'infinite';
-    localStorage.setItem('viewMode', 'infinite');
-    
-    // 隐藏目录浏览容器，显示无限浏览容器
-    document.getElementById('folderViewContainer').classList.add('hidden');
-    document.getElementById('infiniteViewContainer').classList.remove('hidden');
-    
-    // 隐藏面包屑（无限浏览不需要面包屑）
-    document.getElementById('breadcrumbContainer').closest('div').classList.add('hidden');
-    
-    updateViewToggleUI();
-    
-    // 如果还没有加载过数据，开始加载
-    if (infiniteImages.length === 0 && !isInfiniteLoading) {
-        await loadInfiniteImages();
-    }
-}
-
-/**
- * 更新视图切换按钮的UI
- */
-function updateViewToggleUI() {
-    const folderIcon = document.getElementById('folderViewIcon');
-    const infiniteIcon = document.getElementById('infiniteViewIcon');
-    const viewModeText = document.getElementById('viewModeText');
-    const viewToggleBtn = document.getElementById('viewToggleBtn');
-    
-    if (currentViewMode === 'folder') {
-        folderIcon.classList.remove('hidden');
-        infiniteIcon.classList.add('hidden');
-        viewModeText.textContent = '目录';
-        viewToggleBtn.title = '点击切换到无限浏览模式';
-    } else {
-        folderIcon.classList.add('hidden');
-        infiniteIcon.classList.remove('hidden');
-        viewModeText.textContent = '无限';
-        viewToggleBtn.title = '点击切换到目录浏览模式';
-    }
-}
-
 // ==================== 无限浏览模式 ====================
-
-// 日期分组数据
-let dateGroups = []; // [{ date: '2026-02-14', count: 10, startIndex: 0 }, ...]
 
 /**
  * 初始化无限滚动
@@ -1106,12 +1008,12 @@ function initInfiniteScroll() {
     
     infiniteScrollObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting && !isInfiniteLoading && hasMoreInfiniteImages && currentViewMode === 'infinite') {
+            if (entry.isIntersecting && !isInfiniteLoading && hasMoreInfiniteImages && !folderFilterEnabled) {
                 loadInfiniteImages();
             }
         });
     }, {
-        rootMargin: '100px' // 提前100px开始加载
+        rootMargin: '100px'
     });
     
     infiniteScrollObserver.observe(trigger);
@@ -1145,7 +1047,6 @@ function initMobileDateNavSwipe() {
         currentY = e.touches[0].clientY;
         const deltaY = currentY - startY;
         
-        // 只允许向下滑动
         if (deltaY > 0) {
             content.style.transform = `translateY(${deltaY}px)`;
         }
@@ -1158,14 +1059,12 @@ function initMobileDateNavSwipe() {
         const deltaY = currentY - startY;
         content.style.transition = 'transform 0.3s ease';
         
-        // 如果下滑超过 100px，关闭弹窗
         if (deltaY > 100) {
             closeMobileDateNav();
             setTimeout(() => {
                 content.style.transform = '';
             }, 300);
         } else {
-            // 否则回弹
             content.style.transform = '';
         }
         
@@ -1176,12 +1075,11 @@ function initMobileDateNavSwipe() {
 
 /**
  * 从路径中提取日期
- * @param {string} path - 图片路径，如 "2026-02-14/image_001.png"
+ * @param {string} path - 图片路径
  * @returns {string} 日期字符串
  */
 function extractDateFromPath(path) {
     if (!path) return '';
-    // 路径格式: 2026-02-14/image_001.png
     const match = path.match(/(\d{4}-\d{2}-\d{2})/);
     return match ? match[1] : '';
 }
@@ -1195,17 +1093,18 @@ async function loadDateNav() {
         if (!response.ok) throw new Error('获取日期列表失败');
         
         const data = await response.json();
-        // 转换格式以兼容现有代码
         dateGroups = (data.dates || []).map((item) => ({
             date: item.date,
             count: item.count,
-            startIndex: -1 // 初始值，后续通过 updateDateGroupStartIndices 计算
+            startIndex: -1
         }));
         
-        // 立即计算一次 startIndex（如果图片已加载）
         updateDateGroupStartIndices();
         
-        renderDateNav();
+        // 只有在非目录筛选模式下才渲染日期导航
+        if (!folderFilterEnabled) {
+            renderDateNav();
+        }
     } catch (error) {
         console.error('[日期导航] 加载日期列表失败:', error);
     }
@@ -1213,17 +1112,14 @@ async function loadDateNav() {
 
 /**
  * 更新日期分组的起始索引
- * 根据已加载的图片列表计算每个日期对应的起始位置
  */
 function updateDateGroupStartIndices() {
     if (dateGroups.length === 0 || infiniteImages.length === 0) return;
     
-    // 重置所有 startIndex
     dateGroups.forEach(group => {
         group.startIndex = -1;
     });
     
-    // 遍历所有已加载的图片，记录每个日期的第一个出现位置（转换为真实列表索引）
     for (let i = 0; i < infiniteImages.length; i++) {
         const date = extractDateFromPath(infiniteImages[i].path);
         if (!date) continue;
@@ -1272,7 +1168,7 @@ function openMobileDateNav() {
     const modal = document.getElementById('mobileDateNavModal');
     if (modal) {
         modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden'; // 禁止背景滚动
+        document.body.style.overflow = 'hidden';
     }
 }
 
@@ -1283,14 +1179,14 @@ function closeMobileDateNav() {
     const modal = document.getElementById('mobileDateNavModal');
     if (modal) {
         modal.classList.add('hidden');
-        document.body.style.overflow = ''; // 恢复背景滚动
+        document.body.style.overflow = '';
     }
 }
 
 /**
  * 格式化日期用于导航显示
- * @param {string} dateStr - 日期字符串，如 "2026-02-14"
- * @returns {string} 格式化后的日期
+ * @param {string} dateStr - 日期字符串
+ * @returns {string}
  */
 function formatDateForNav(dateStr) {
     const date = new Date(dateStr);
@@ -1298,14 +1194,12 @@ function formatDateForNav(dateStr) {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     
-    // 判断是否是今天/昨天
     if (dateStr === today.toISOString().split('T')[0]) {
         return '今天';
     } else if (dateStr === yesterday.toISOString().split('T')[0]) {
         return '昨天';
     }
     
-    // 返回 "2月14日" 格式
     return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
@@ -1313,15 +1207,8 @@ function formatDateForNav(dateStr) {
  * 跳转到指定日期的图片
  * @param {string} date - 日期字符串
  */
-/**
- * 跳转到指定日期的图片
- * @param {string} date - 日期字符串
- */
 async function jumpToDate(date) {
-    // 防止与进行中的加载操作冲突
     if (isInfiniteLoading) {
-        console.log('[跳转] 等待当前加载完成...');
-        // 轮询等待加载完成（最多等 5 秒）
         const start = Date.now();
         while (isInfiniteLoading && Date.now() - start < 5000) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -1340,8 +1227,6 @@ async function jumpToDate(date) {
 
     let targetIndex = group.startIndex;
 
-    // 如果 startIndex 为 -1，说明该日期的图片还未加载
-    // 需要通过 API 获取该日期的偏移量
     if (targetIndex === -1) {
         console.log(`[跳转] 日期 ${date} 尚未加载，正在获取偏移量...`);
         try {
@@ -1356,10 +1241,7 @@ async function jumpToDate(date) {
                 return;
             }
 
-            // 更新 group 的 startIndex，避免下次重复请求
             group.startIndex = targetIndex;
-
-            console.log(`[跳转] 日期 ${date} 的偏移量为 ${targetIndex}，当前 baseOffset=${baseOffset}，已加载 ${infiniteImages.length} 张`);
         } catch (error) {
             console.error('[跳转] 获取日期偏移量失败:', error);
             showToast('跳转到日期失败', 'error');
@@ -1368,45 +1250,32 @@ async function jumpToDate(date) {
     }
 
     const grid = document.getElementById('infiniteImageGrid');
-
-    // 检查目标是否在当前已加载范围内
     const isInCurrentRange = targetIndex >= baseOffset && targetIndex < baseOffset + infiniteOffset;
 
-    console.log(`[跳转] targetIndex=${targetIndex}, baseOffset=${baseOffset}, infiniteOffset=${infiniteOffset}, isInRange=${isInCurrentRange}`);
-
     if (isInCurrentRange && grid.children[targetIndex - baseOffset]) {
-        // 目标已加载，直接滚动
         const relativeIndex = targetIndex - baseOffset;
         const targetElement = grid.children[relativeIndex];
 
-        // 验证目标图片是否确实属于请求日期
         const imgInCard = targetElement.querySelector('img');
         const imgSrc = imgInCard ? (imgInCard.getAttribute('data-src') || imgInCard.src) : '';
         const actualDate = extractDateFromPath(imgSrc);
         if (actualDate !== date) {
             console.warn(`[跳转] 快速路径验证失败：期望 ${date}，实际 ${actualDate}，改用 API 加载`);
-            // 回退到 API 重新加载
             targetIndex = -1;
             group.startIndex = -1;
             return jumpToDate(date);
         }
 
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-        // 高亮效果
         targetElement.classList.add('ring-2', 'ring-primary-500');
         setTimeout(() => {
             targetElement.classList.remove('ring-2', 'ring-primary-500');
         }, 2000);
 
-        console.log(`[跳转] 快速路径：滚动到已加载位置 ${relativeIndex}`);
         return;
     }
 
-    // 目标不在当前范围，直接从目标偏移量附近加载（虚拟滚动思路）
-    // 向前预加载一些缓冲，让目标图片出现在批次中间偏后位置，
-    // 这样向上滚动时能看到更早的图片，向下也能继续加载。
-    const buffer = Math.floor(infiniteLimit * 0.8); // 40 张向前缓冲
+    const buffer = Math.floor(infiniteLimit * 0.8);
     const newBaseOffset = Math.max(0, targetIndex - buffer);
     console.log(`[跳转] 从偏移量 ${newBaseOffset} 加载，目标在相对索引 ${targetIndex - newBaseOffset}...`);
 
@@ -1419,10 +1288,8 @@ async function jumpToDate(date) {
     grid.innerHTML = '';
     document.getElementById('infiniteEndMessage').classList.add('hidden');
 
-    // 加载一批数据（只发 1 次请求）
     await loadInfiniteImages();
 
-    // 滚动到目标图片所在的位置
     const targetRelativeIndex = targetIndex - newBaseOffset;
     const targetElement = grid.children[targetRelativeIndex];
     if (targetElement) {
@@ -1432,30 +1299,19 @@ async function jumpToDate(date) {
             targetElement.classList.remove('ring-2', 'ring-primary-500');
         }, 2000);
         showToast(`已跳转到 ${formatDateForNav(date)}`, 'success');
-
-        // 验证实际滚到的图片日期
-        const imgInCard = targetElement.querySelector('img');
-        const imgSrc = imgInCard ? (imgInCard.getAttribute('data-src') || imgInCard.src) : '';
-        const actualDate = extractDateFromPath(imgSrc);
-        console.log(`[跳转] 目标日期=${date}，实际图片日期=${actualDate}，baseOffset=${baseOffset}，相对索引=${targetRelativeIndex}`);
     } else if (grid.children[0]) {
-        console.warn(`[跳转] 目标相对索引 ${targetRelativeIndex} 越界（共 ${grid.children.length} 个子元素）`);
-        // 回退：滚动到第一个元素
         grid.children[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-        console.error(`[跳转] 加载后 grid 为空`);
     }
 }
 
 /**
- * 加载图片直到指定索引（串行加载，避免并发请求风暴）
- * @param {number} targetIndex - 目标索引（相对于整个列表）
- * @returns {number} 目标元素在当前列表中的索引
+ * 加载图片直到指定索引
+ * @param {number} targetIndex - 目标索引
+ * @returns {number}
  */
 async function loadUntilIndex(targetIndex) {
     console.log(`[加载] 目标索引: ${targetIndex}, 当前已加载: ${baseOffset + infiniteOffset}`);
     
-    // 如果目标索引在当前已加载范围内，直接返回相对索引
     if (targetIndex >= baseOffset && targetIndex < baseOffset + infiniteOffset) {
         return targetIndex - baseOffset;
     }
@@ -1464,55 +1320,37 @@ async function loadUntilIndex(targetIndex) {
         return -1;
     }
     
-    // 串行加载直到覆盖目标索引
     while (targetIndex >= baseOffset + infiniteOffset && hasMoreInfiniteImages) {
         await loadInfiniteImages();
     }
     
-    // 更新日期起始索引
     updateDateGroupStartIndices();
     
-    // 返回目标元素在当前列表中的相对索引
     return targetIndex < baseOffset + infiniteOffset ? targetIndex - baseOffset : -1;
 }
 
 /**
- * 回到顶部
- */
-function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-/**
  * 更新当前激活的日期导航项
- * 根据滚动位置自动高亮对应的日期
- * 
- * 优化：避免遍历所有 DOM 节点和调用 getBoundingClientRect()
- * 改用基于网格布局的滚动位置估算，大幅减少 reflow 开销
  */
 function updateActiveDateNav() {
-    if (dateGroups.length === 0 || currentViewMode !== 'infinite') return;
+    if (dateGroups.length === 0 || folderFilterEnabled) return;
     
     const grid = document.getElementById('infiniteImageGrid');
     if (!grid || grid.children.length === 0) return;
     
-    // 根据网格样式计算列数和行高（无需查询每个元素）
     const gridStyle = window.getComputedStyle(grid);
     const colCount = gridStyle.gridTemplateColumns.split(' ').filter(c => c && c !== '0px').length || 2;
     const gap = parseInt(gridStyle.gap) || 16;
-    const itemHeight = grid.clientWidth / colCount; // aspect-square，高度≈宽度
+    const itemHeight = grid.clientWidth / colCount;
     const rowHeight = itemHeight + gap;
     
-    // 估算当前视口顶部对应的元素索引
     const scrollTop = window.scrollY - grid.offsetTop + 120;
     const rowIndex = Math.max(0, Math.floor(scrollTop / rowHeight));
     const visibleIndex = Math.min(rowIndex * colCount, infiniteImages.length - 1);
     
-    // 转换为真实列表索引，再找到对应的日期组
     const realIndex = baseOffset + visibleIndex;
     const group = dateGroups.find(g => realIndex >= g.startIndex && (g.startIndex === -1 || realIndex < g.startIndex + g.count));
     if (group && group.startIndex !== -1) {
-        // 更新导航高亮
         document.querySelectorAll('#infiniteDateNav button').forEach(btn => {
             btn.classList.remove('date-nav-active');
             if (btn.getAttribute('onclick').includes(`'${group.date}'`)) {
@@ -1522,15 +1360,14 @@ function updateActiveDateNav() {
     }
 }
 
-// 添加滚动监听（使用节流 + passive，提升滚动性能）
+// 滚动监听
 let scrollThrottleTimer = null;
 window.addEventListener('scroll', () => {
     if (scrollThrottleTimer) return;
     scrollThrottleTimer = setTimeout(() => {
         updateActiveDateNav();
         
-        // 接近顶部时触发向上加载（双向无限滚动）
-        if (currentViewMode === 'infinite' && window.scrollY < 500 && baseOffset > 0 && !isInfiniteLoading) {
+        if (!folderFilterEnabled && window.scrollY < 500 && baseOffset > 0 && !isInfiniteLoading) {
             loadPreviousImages();
         }
         
@@ -1555,7 +1392,6 @@ async function loadInfiniteImages() {
         const newImages = data.files || [];
         
         if (newImages.length > 0) {
-            // 格式化图片数据
             const formattedImages = newImages.map(img => ({
                 name: img.name,
                 path: img.path,
@@ -1568,28 +1404,25 @@ async function loadInfiniteImages() {
             infiniteOffset += newImages.length;
             hasMoreInfiniteImages = data.hasMore;
             
-            // 渲染新加载的图片
-            // isFirstBatch: 当前 infiniteImages 中只有这批新数据（即加载前为空）
-            renderInfiniteImages(formattedImages, infiniteImages.length === newImages.length);
+            // 只有在非目录筛选模式下才渲染
+            if (!folderFilterEnabled) {
+                renderInfiniteImages(formattedImages, infiniteImages.length === newImages.length);
+            }
             
-            // 首次加载时获取日期导航
             if (infiniteImages.length === newImages.length) {
                 loadDateNav();
             }
             
-            // 更新总数
             if (infiniteTotalCount === 0) {
                 updateInfiniteTotalCount();
             }
             
-            // 更新日期的 startIndex（用于跳转）
             updateDateGroupStartIndices();
         } else {
             hasMoreInfiniteImages = false;
             showInfiniteEndMessage();
         }
         
-        // 如果是第一次加载且没有数据，显示空状态
         if (infiniteImages.length === 0 && newImages.length === 0) {
             showInfiniteEmptyState();
         }
@@ -1604,7 +1437,7 @@ async function loadInfiniteImages() {
 }
 
 /**
- * 向上加载无限浏览图片（在 baseOffset 之前加载）
+ * 向上加载无限浏览图片
  */
 async function loadPreviousImages() {
     if (isInfiniteLoading || baseOffset === 0) return;
@@ -1612,7 +1445,6 @@ async function loadPreviousImages() {
     isInfiniteLoading = true;
     
     const grid = document.getElementById('infiniteImageGrid');
-    // 保存参考元素用于滚动位置修正
     let oldFirstChild = null;
     let oldRectTop = 0;
     if (grid && grid.firstElementChild) {
@@ -1639,21 +1471,20 @@ async function loadPreviousImages() {
                 mtime: img.mtime
             }));
             
-            // 在数组开头插入
             infiniteImages.unshift(...formattedImages);
             baseOffset = newBaseOffset;
             infiniteOffset = infiniteImages.length;
             
-            // 在 DOM 开头插入
-            renderInfiniteImagesAtTop(formattedImages);
+            // 只有在非目录筛选模式下才渲染
+            if (!folderFilterEnabled) {
+                renderInfiniteImagesAtTop(formattedImages);
+            }
             
-            // 修正滚动位置，保持视觉焦点不变
             if (oldFirstChild) {
                 const newRectTop = oldFirstChild.getBoundingClientRect().top;
                 window.scrollBy(0, newRectTop - oldRectTop);
             }
             
-            // 更新日期的 startIndex
             updateDateGroupStartIndices();
         }
         
@@ -1675,7 +1506,6 @@ function renderInfiniteImagesAtTop(images) {
     const fragment = document.createDocumentFragment();
     
     images.forEach((file, index) => {
-        // 新插入的图片在开头，索引从 0 开始
         const relativeIndex = index;
         
         const card = document.createElement('div');
@@ -1701,7 +1531,7 @@ function renderInfiniteImagesAtTop(images) {
         overlay.innerHTML = `
             <div class="absolute bottom-0 left-0 right-0 p-3">
                 <p class="text-white text-xs truncate">${file.name}</p>
-                <p class="text-white/70 text-xs">${formatFileSize(file.size)} · ${formatDate(file.mtime)}</p>
+                <p class="text-white/70 text-xs">${formatFileSize(file.size)} \u00b7 ${formatDate(file.mtime)}</p>
             </div>
         `;
         
@@ -1712,7 +1542,7 @@ function renderInfiniteImagesAtTop(images) {
     
     grid.insertBefore(fragment, grid.firstChild);
     
-    // 更新所有已有 DOM 元素的 onclick 索引（原有图片索引都后移了）
+    // 更新所有已有 DOM 元素的 onclick 索引
     const existingCards = Array.from(grid.children).slice(images.length);
     existingCards.forEach((card, i) => {
         const newIndex = images.length + i;
@@ -1741,34 +1571,27 @@ function renderInfiniteImages(images, isFirstBatch) {
     if (isFirstBatch) {
         grid.innerHTML = '';
         emptyState.classList.add('hidden');
-        // 第一批数据时初始化懒加载观察器
         initImageLazyObserver();
     }
     
-    // 使用 DocumentFragment 批量插入 DOM，减少重排
     const fragment = document.createDocumentFragment();
     
     images.forEach((file, index) => {
-        // 使用在 infiniteImages 数组中的相对索引
         const relativeIndex = infiniteImages.length - images.length + index;
         
         const card = document.createElement('div');
-        // 移除了 card-hover（含 translateY transform），老旧 iPad 上大量 GPU 合成层会卡死
         card.className = 'group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 img-skeleton hover:border-primary-300 dark:hover:border-primary-700 transition-colors duration-200';
         card.onclick = () => openInfinitePreview(relativeIndex);
         
         const img = document.createElement('img');
         img.setAttribute('data-src', file.fullPath);
         img.alt = file.name;
-        // 注意：移除了 transition-transform duration-300 group-hover:scale-105
-        // 老旧 iPad 上大量 GPU 合成层会导致严重卡顿
         img.className = 'lazy-image w-full h-full object-cover';
         img.loading = 'lazy';
         img.onload = function() {
             card.classList.remove('img-skeleton');
         };
         img.onerror = function() {
-            // removeAttribute('src') 不会触发 onerror，但如果其他原因触发了，检查 src 是否存在
             if (!img.getAttribute('src')) return;
             card.classList.remove('img-skeleton');
             card.innerHTML = '<div class="w-full h-full flex items-center justify-center text-slate-400"><span class="text-xs">加载失败</span></div>';
@@ -1779,7 +1602,7 @@ function renderInfiniteImages(images, isFirstBatch) {
         overlay.innerHTML = `
             <div class="absolute bottom-0 left-0 right-0 p-3">
                 <p class="text-white text-xs truncate">${file.name}</p>
-                <p class="text-white/70 text-xs">${formatFileSize(file.size)} · ${formatDate(file.mtime)}</p>
+                <p class="text-white/70 text-xs">${formatFileSize(file.size)} \u00b7 ${formatDate(file.mtime)}</p>
             </div>
         `;
         
@@ -1790,7 +1613,6 @@ function renderInfiniteImages(images, isFirstBatch) {
     
     grid.appendChild(fragment);
     
-    // 为新添加的图片添加懒加载观察（用于加载和内存回收）
     const newLazyImages = grid.querySelectorAll('.lazy-image');
     newLazyImages.forEach(img => {
         if (imageLazyObserver) {
@@ -1852,7 +1674,6 @@ async function updateInfiniteTotalCount() {
  * @param {number} index - 图片索引
  */
 async function openInfinitePreview(index) {
-    // 安全检查
     if (index < 0 || index >= infiniteImages.length) {
         console.error(`[预览] 索引 ${index} 超出范围 (0-${infiniteImages.length - 1})`);
         return;
@@ -1863,27 +1684,20 @@ async function openInfinitePreview(index) {
     const img = document.getElementById('previewImg');
     const file = infiniteImages[index];
     
-    // 使用无限浏览的图片列表
     currentImages = infiniteImages;
     
     img.src = file.fullPath;
     preview.classList.remove('hidden');
-    
-    // 禁止背景滚动
     document.body.style.overflow = 'hidden';
     
-    // 更新导航按钮状态
     updateNavButtons();
     
-    // 设置当前图片额外信息
     currentImageExtraInfo = {
         folder: extractFolderFromPath(file.path),
         time: formatPopupTime(file.mtime)
     };
     
-    // 预解析图片信息
     await preloadImageInfo(file.fullPath);
-    // 预加载工作流
     await preloadWorkflowInfo(file.fullPath);
 }
 
@@ -1891,7 +1705,6 @@ async function openInfinitePreview(index) {
  * 刷新无限浏览数据
  */
 async function refreshInfiniteView() {
-    // 重置状态
     infiniteImages = [];
     infiniteOffset = 0;
     baseOffset = 0;
@@ -1899,14 +1712,11 @@ async function refreshInfiniteView() {
     infiniteTotalCount = 0;
     dateGroups = [];
     
-    // 清空网格和导航
     document.getElementById('infiniteImageGrid').innerHTML = '';
     document.getElementById('infiniteDateNav').innerHTML = '';
     document.getElementById('infiniteEndMessage').classList.add('hidden');
     
-    // 重新加载
     await loadInfiniteImages();
     
-    // 触发后台扫描更新数据库
     fetch('/api/scan-images', { method: 'POST' }).catch(() => {});
 }

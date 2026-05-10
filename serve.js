@@ -248,6 +248,7 @@ const server = http.createServer((req, res) => {
         '/': '/pages/index.html',
         '/gallery': '/pages/gallery.html',
         '/history-gallery': '/pages/history-gallery.html',
+        '/model-evaluate': '/pages/model-evaluate.html',
         '/api/local-ip': '/api/local-ip'
     };
 
@@ -518,6 +519,129 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 获取模型封面列表
+    if (req.url === '/api/model-covers' && req.method === 'GET') {
+        try {
+            const coverDir = path.join(__dirname, 'storage', 'model-covers');
+            let covers = [];
+            if (fs.existsSync(coverDir)) {
+                const items = fs.readdirSync(coverDir);
+                covers = items
+                    .filter(item => item.toLowerCase().endsWith('.png'))
+                    .map(item => item.slice(0, -4)); // 去掉 .png
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ covers }), 'utf-8');
+        } catch (error) {
+            console.error('[API] 获取封面列表失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '获取封面列表失败' }), 'utf-8');
+        }
+        return;
+    }
+
+    // 获取文件信息（mtime 等）
+    if (req.url.startsWith('/api/file-info')) {
+        try {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const subfolder = url.searchParams.get('subfolder') || '';
+            const filename = url.searchParams.get('filename') || '';
+            
+            if (!filename) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '缺少参数' }), 'utf-8');
+                return;
+            }
+            
+            // 统一处理 Windows 反斜杠
+            const normalizedSubfolder = subfolder.replace(/\\/g, '/');
+            
+            // 拼接路径
+            const relativePath = normalizedSubfolder ? `${normalizedSubfolder}/${filename}` : filename;
+            
+            // 防止路径遍历
+            if (relativePath.includes('..')) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '无效的路径' }), 'utf-8');
+                return;
+            }
+            
+            // 从项目根目录的上一级（ComfyUI output 目录）开始查找
+            const filePath = path.join(__dirname, '..', relativePath);
+            if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '文件不存在' }), 'utf-8');
+                return;
+            }
+            
+            const stat = fs.statSync(filePath);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                mtime: stat.mtime.toISOString(),
+                size: stat.size
+            }), 'utf-8');
+        } catch (error) {
+            console.error('[API] 获取文件信息失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '获取文件信息失败' }), 'utf-8');
+        }
+        return;
+    }
+
+    // 保存测评任务汇总
+    if (req.url === '/api/save-evaluate-task' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { taskData } = JSON.parse(body);
+                if (!taskData) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '缺少任务数据' }), 'utf-8');
+                    return;
+                }
+
+                // evaluate 目录在项目根目录的同级
+                const evaluateDir = path.join(__dirname, 'storage', 'evaluate');
+                if (!fs.existsSync(evaluateDir)) {
+                    fs.mkdirSync(evaluateDir, { recursive: true });
+                }
+
+                // 生成文件名
+                const now = new Date();
+                const dateStr = now.toISOString().replace(/[:T]/g, '-').split('.')[0];
+                const filename = `eva_task_${dateStr}.json`;
+                const filePath = path.join(evaluateDir, filename);
+
+                // 处理图片绝对路径
+                if (taskData.models) {
+                    taskData.models.forEach(model => {
+                        if (model.images) {
+                            model.images = model.images.map(img => {
+                                if (img.subfolder && img.filename) {
+                                    // 拼接绝对路径：假设 subfolder 是相对于 ComfyUI output 目录的
+                                    // 而 output 目录在项目根目录的上一级
+                                    return path.join(__dirname, '..', img.subfolder, img.filename);
+                                }
+                                return img.url || img;
+                            });
+                        }
+                    });
+                }
+
+                fs.writeFileSync(filePath, JSON.stringify(taskData, null, 2), 'utf-8');
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, path: filePath }), 'utf-8');
+            } catch (error) {
+                console.error('[API] 保存测评任务汇总失败:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '保存任务汇总失败' }), 'utf-8');
+            }
+        });
+        return;
+    }
+
     // 设置模型封面
     if (req.url === '/api/set-model-cover' && req.method === 'POST') {
         let body = '';
@@ -531,26 +655,25 @@ const server = http.createServer((req, res) => {
                     return;
                 }
                 
+                // 统一处理 Windows 反斜杠
+                let normalizedSourcePath = sourcePath.replace(/\\/g, '/');
+                
                 // 防止路径遍历
-                if (sourcePath.includes('..')) {
+                if (normalizedSourcePath.includes('..')) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: '无效的路径' }), 'utf-8');
                     return;
                 }
                 
-                // ComfyUI 返回的 subfolder 可能已包含 easy-use/ 前缀，需要兼容处理
-                let normalizedSourcePath = sourcePath;
-                if (normalizedSourcePath.startsWith('easy-use/') || normalizedSourcePath.startsWith('easy-use\\')) {
-                    normalizedSourcePath = normalizedSourcePath.slice('easy-use/'.length);
-                }
-                const sourceFullPath = path.join(__dirname, '..', 'easy-use', normalizedSourcePath);
+                // 从项目根目录的上一级（ComfyUI output 目录）开始查找
+                const sourceFullPath = path.join(__dirname, '..', normalizedSourcePath);
                 if (!fs.existsSync(sourceFullPath) || !fs.statSync(sourceFullPath).isFile()) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: '源文件不存在' }), 'utf-8');
                     return;
                 }
                 
-                const coverDir = path.join(__dirname, 'model-covers');
+                const coverDir = path.join(__dirname, 'storage', 'model-covers');
                 if (!fs.existsSync(coverDir)) {
                     fs.mkdirSync(coverDir, { recursive: true });
                 }
@@ -568,6 +691,39 @@ const server = http.createServer((req, res) => {
                 res.end(JSON.stringify({ error: '设置封面失败' }), 'utf-8');
             }
         });
+        return;
+    }
+
+    // 提供 model-covers 静态文件访问（实际存储在 storage/model-covers/）
+    if (req.url.startsWith('/model-covers/')) {
+        try {
+            const filePathParam = req.url.replace('/model-covers/', '');
+            if (filePathParam.includes('..')) {
+                res.writeHead(400);
+                res.end('Bad Request');
+                return;
+            }
+            const targetPath = path.join(__dirname, 'storage', 'model-covers', filePathParam);
+            if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+                res.writeHead(404);
+                res.end('Not Found');
+                return;
+            }
+            const extname = path.extname(targetPath);
+            const contentType = mimeTypes[extname] || 'application/octet-stream';
+            fs.readFile(targetPath, (error, content) => {
+                if (error) {
+                    res.writeHead(500);
+                    res.end('Server Error');
+                } else {
+                    res.writeHead(200, { 'Content-Type': contentType });
+                    res.end(content, 'utf-8');
+                }
+            });
+        } catch (error) {
+            res.writeHead(500);
+            res.end('Server Error');
+        }
         return;
     }
 

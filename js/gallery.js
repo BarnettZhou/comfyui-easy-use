@@ -36,7 +36,7 @@ function formatPopupTime(input) {
     } else {
         date = new Date(input);
     }
-    if (isNaN(date.getTime())) return '-';
+    if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return '-';
     return date.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',

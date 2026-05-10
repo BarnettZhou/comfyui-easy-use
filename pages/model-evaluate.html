@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="description" content="ZIT Easy Use - 模型测评">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZIT">
+    <link rel="apple-touch-icon" href="../resources/icon.png">
+    <link rel="icon" href="../resources/icon.png" type="image/png">
+    <title>模型测评 - ZIT-Easy-Use</title>
+    <script src="../js/tailwind.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.7);
+        }
+        
+        .input-focus {
+            transition: all 0.2s ease;
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        
+        .card-hover {
+            transition: all 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+        }
+        
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        
+        .img-skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        .dark .img-skeleton {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* 底部 popup 动画 */
+        .info-popup {
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .info-popup.show {
+            transform: translateY(0);
+        }
+
+        /* 模型卡片选中状态 */
+        .model-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .model-card.selected {
+            ring: 2px;
+            --tw-ring-color: rgb(59 130 246);
+            ring-offset: 2px;
+        }
+        .dark .model-card.selected {
+            --tw-ring-offset-color: rgb(30 41 59);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+    <!-- 顶部导航栏 -->
+    <nav class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-700 transition-colors duration-300">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- 返回首页 -->
+                <a href="/" class="flex items-center space-x-3 group">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30 group-hover:shadow-primary-500/50 group-hover:scale-105 transition-all duration-300">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
+                            模型测评
+                        </h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">多模型横向对比</p>
+                    </div>
+                </a>
+
+                <!-- 右侧按钮组 -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <button onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200 group" title="切换主题">
+                        <svg class="w-5 h-5 text-amber-500 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        <svg class="w-5 h-5 text-slate-600 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 pb-32">
+        
+        <!-- 测评模型列表 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <div class="px-5 sm:px-6 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
+                    </div>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">测评模型</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <!-- 视图切换 -->
+                    <div class="flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5 mr-1">
+                        <button onclick="switchModelView('cover')" id="viewModeCover" class="p-1.5 rounded-md bg-white dark:bg-slate-600 shadow-sm transition-all" title="封面模式">
+                            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                            </svg>
+                        </button>
+                        <button onclick="switchModelView('tag')" id="viewModeTag" class="p-1.5 rounded-md transition-all" title="标签模式">
+                            <svg class="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <button onclick="selectAllModels(true)" class="text-xs px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors">全选</button>
+                    <button onclick="selectAllModels(false)" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">取消全选</button>
+                </div>
+            </div>
+            <div id="modelCardsContainer" class="px-5 sm:px-6 py-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- 模型卡片将在这里渲染 -->
+            </div>
+        </section>
+
+        <!-- 提示词区域 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden card-hover transition-colors duration-300">
+            <div class="p-5 sm:p-6">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        <span>提示词</span>
+                    </label>
+                    <button id="promptToggleBtn" onclick="togglePromptHeight()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center space-x-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                        </svg>
+                        <span>放大</span>
+                    </button>
+                </div>
+                <textarea id="promptText" rows="3" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl p-4 outline-none input-focus text-sm resize-none placeholder-slate-400 transition-colors duration-300" placeholder="请输入图像生成提示词，描述你想要生成的画面..."></textarea>
+            </div>
+        </section>
+
+        <!-- 生成参数 -->
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                        </svg>
+                    </div>
+                    <span class="font-semibold text-slate-700 dark:text-slate-300">生成参数</span>
+                </div>
+            </div>
+            <div class="px-5 sm:px-6 pb-5 sm:pb-6 grid sm:grid-cols-2 gap-4 pt-4">
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">VAE</label>
+                    <div class="relative">
+                        <select id="vaeSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">采样器组合</label>
+                    <div class="relative">
+                        <select id="samplerSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">图片尺寸</label>
+                    <div class="relative">
+                        <select id="sizeSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300">
+                            <option value="1024,1024">1024 x 1024</option>
+                            <option value="960,1280">960 x 1280</option>
+                            <option value="1280,960">1280 x 960</option>
+                        </select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">采样步数</label>
+                    <div class="relative">
+                        <select id="stepsSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300">
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9" selected>9</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">生成数量（每个模型）</label>
+                    <div class="flex space-x-2">
+                        <button onclick="setBatchCount(1)" data-batch="1" class="batch-btn flex-1 py-3 rounded-xl bg-primary-600 text-white text-sm font-medium transition-all">1 张</button>
+                        <button onclick="setBatchCount(2)" data-batch="2" class="batch-btn flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">2 张</button>
+                        <button onclick="setBatchCount(4)" data-batch="4" class="batch-btn flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">4 张</button>
+                        <button onclick="setBatchCount(8)" data-batch="8" class="batch-btn flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">8 张</button>
+                    </div>
+                    <input type="hidden" id="batchCount" value="1">
+                </div>
+            </div>
+        </section>
+
+        <!-- 任务进度 -->
+        <section id="progressContainer" class="hidden bg-gradient-to-r from-primary-500/10 to-purple-500/10 dark:from-primary-900/30 dark:to-purple-900/30 rounded-2xl border border-primary-200 dark:border-primary-800 p-5 sm:p-6">
+            <div class="flex items-center space-x-2 mb-4">
+                <div class="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></div>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">生成进度</span>
+                <span id="progressModelText" class="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 font-medium ml-auto">-</span>
+            </div>
+            <div class="space-y-3">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-primary-700 dark:text-primary-400 font-medium">采样进度</span>
+                    <span id="progressText" class="text-slate-600 dark:text-slate-400 font-mono">0%</span>
+                </div>
+                <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-primary-500 to-primary-600 h-2.5 rounded-full w-0"></div>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400 mt-1">
+                    <span id="progressModelIndex">模型 1 / 5</span>
+                    <span id="progressTaskIndex">任务 1 / 2</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 取消按钮区 -->
+        <section id="cancelSection" class="hidden grid grid-cols-1 gap-4">
+            <button onclick="interruptEvaluation()" class="bg-amber-500 hover:bg-amber-600 text-white py-4 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="hidden sm:inline">取消测评</span>
+                <span class="sm:hidden">取消</span>
+            </button>
+        </section>
+
+        <!-- 生成结果 -->
+        <section id="resultArea" class="pt-4 pb-24">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>生成结果</span>
+                </h2>
+                <span id="resultCount" class="text-xs px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hidden">0 张</span>
+            </div>
+            <div id="resultContainer" class="space-y-8">
+                <!-- 按模型分组的结果将在这里渲染 -->
+            </div>
+            <div id="emptyState" class="text-center py-12">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                    <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <p class="text-slate-400 dark:text-slate-500 text-sm">点击"开始测评"按钮生成图片</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- 底部悬浮开始测评按钮 -->
+    <div class="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+            <div class="glass rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 border border-slate-200/50 dark:border-slate-700/50 p-3">
+                <button id="evaluateBtn" onclick="startEvaluation()" class="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3.5 px-6 rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none active:scale-[0.98]">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m6 0a2 2 0 002-2v-6a2 2 0 00-2-2h-2a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z"></path>
+                    </svg>
+                    <span>开始测评</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全屏预览 -->
+    <div id="fullPreview" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+        <!-- 顶部操作栏 -->
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent z-20">
+            <div class="flex items-center space-x-2">
+                <button onclick="closePreview()" class="flex items-center space-x-2 text-white/80 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    <span>关闭</span>
+                </button>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="copyWorkflow()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                    </svg>
+                    <span class="hidden sm:inline">复制工作流</span>
+                    <span class="sm:hidden">工作流</span>
+                </button>
+                <button onclick="setAsModelCover()" class="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="hidden sm:inline">设为模型封面</span>
+                    <span class="sm:hidden">封面</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 图片 -->
+        <img id="previewImg" src="" class="max-h-[85vh] max-w-full rounded-lg shadow-2xl">
+        
+        <!-- 底部按钮栏 -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 flex justify-center items-center bg-gradient-to-t from-black/80 to-transparent z-20">
+            <button id="infoBtn" onclick="toggleInfoPopup()" class="flex items-center space-x-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-full transition-all border border-white/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>图片信息</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 图片信息 Popup (从底部弹出) -->
+    <div id="infoPopup" class="fixed inset-0 z-[60] hidden">
+        <!-- 遮罩层 -->
+        <div id="infoPopupOverlay" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" onclick="closeInfoPopup()"></div>
+        
+        <!-- Popup 内容 -->
+        <div id="infoPopupContent" class="info-popup absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-3xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <!-- 拖动条 -->
+            <div class="flex justify-center pt-3 pb-2" onclick="closeInfoPopup()">
+                <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
+            </div>
+            
+            <!-- 标题栏 -->
+            <div class="px-6 py-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200">图片信息</h3>
+                <button onclick="closeInfoPopup()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- 内容区域 -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- 加载状态 -->
+                <div id="popupInfoLoading" class="text-center py-8">
+                    <div class="inline-block w-8 h-8 border-3 border-primary-200 dark:border-primary-800 border-t-primary-600 rounded-full animate-spin"></div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-3">正在解析图片信息...</p>
+                </div>
+                
+                <!-- 信息内容 -->
+                <div id="popupInfoContent" class="hidden space-y-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">尺寸</p>
+                            <p id="popupInfoSize" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">采样器</p>
+                            <p id="popupInfoSampler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">调度器</p>
+                            <p id="popupInfoScheduler" class="text-slate-800 dark:text-slate-200 text-sm font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">步数</p>
+                            <p id="popupInfoSteps" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">CFG</p>
+                            <p id="popupInfoCfg" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">VAE</p>
+                            <p id="popupInfoVae" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">模型</p>
+                            <p id="popupInfoModel" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">种子</p>
+                            <p id="popupInfoSeed" class="text-slate-800 dark:text-slate-200 text-sm font-mono truncate" title="">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">所在目录</p>
+                            <p id="popupInfoFolder" class="text-slate-800 dark:text-slate-200 text-sm font-medium truncate" title="">-</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center border border-slate-200 dark:border-slate-700">
+                            <p class="text-slate-400 dark:text-slate-500 text-xs mb-1">生成时间</p>
+                            <p id="popupInfoTime" class="text-slate-800 dark:text-slate-200 text-sm font-mono font-medium">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">提示词</p>
+                            <button onclick="copyPromptFromPopup()" class="flex items-center space-x-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors text-sm px-3 py-1.5 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>复制</span>
+                            </button>
+                        </div>
+                        <p id="popupInfoPrompt" class="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap break-words">-</p>
+                    </div>
+                </div>
+                
+                <!-- 无信息状态 -->
+                <div id="popupInfoEmpty" class="hidden text-center py-8">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                        <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">未能解析到图片生成信息</p>
+                    <p class="text-slate-400 dark:text-slate-500 text-xs mt-1">该图片可能不是由 ComfyUI 生成</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast通知 -->
+    <div id="toast" class="fixed top-5 right-5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 py-4 px-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 transform translate-x-full opacity-0 transition-all duration-300 z-50 flex items-center space-x-3">
+        <div id="toastIcon" class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+        <div id="toastMessage" class="font-medium text-sm"></div>
+    </div>
+
+    <script src="../js/common.js"></script>
+    <script src="../js/model-evaluate.js"></script>
+</body>
+</html>

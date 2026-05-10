@@ -419,7 +419,7 @@ function formatPopupTime(input) {
     } else {
         date = new Date(input);
     }
-    if (isNaN(date.getTime())) return '-';
+    if (isNaN(date.getTime()) || date.getFullYear() <= 1970) return '-';
     return date.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -448,7 +448,27 @@ function trackTask(id) {
                 const data = await res.json();
                 if(data[id]) {
                     clearInterval(timer);
-                    renderImg(data[id].outputs, data[id].prompt[0]);
+                    
+                    // 尝试从文件系统获取真实的创建时间，替代不稳定的 prompt[0]
+                    let timestamp = data[id].prompt[0];
+                    try {
+                        const outputs = data[id].outputs;
+                        const firstNodeId = Object.keys(outputs)[0];
+                        const firstImg = outputs[firstNodeId]?.images?.[0];
+                        if (firstImg) {
+                            const infoRes = await fetch(`/api/file-info?subfolder=${encodeURIComponent(firstImg.subfolder)}&filename=${encodeURIComponent(firstImg.filename)}`);
+                            if (infoRes.ok) {
+                                const info = await infoRes.json();
+                                if (info.mtime) {
+                                    timestamp = new Date(info.mtime).getTime() / 1000;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.log('获取文件创建时间失败，fallback 到 prompt[0]:', e);
+                    }
+                    
+                    renderImg(data[id].outputs, timestamp);
                     resolve(); 
                 }
             } catch(e) { }
@@ -534,8 +554,40 @@ async function loadHistory() {
     const newHistoryImages = [];
     const newHistoryImageData = [];
 
-    Object.entries(data).reverse().forEach(([taskId, item]) => {
-        if (!item.outputs) return;
+    for (const [taskId, item] of Object.entries(data).reverse()) {
+        if (!item.outputs) continue;
+
+        // 检查该任务是否有新图片
+        let hasNewImages = false;
+        for (let nid in item.outputs) {
+            item.outputs[nid].images?.forEach(img => {
+                const imageKey = `${taskId}-${nid}-${img.filename}`;
+                if (!displayedTaskIds.has(imageKey)) {
+                    hasNewImages = true;
+                }
+            });
+        }
+        if (!hasNewImages) continue;
+
+        // 获取该任务的准确时间（优先用文件 mtime）
+        let timestamp = item.prompt[0];
+        try {
+            const outputs = item.outputs;
+            const firstNodeId = Object.keys(outputs)[0];
+            const firstImg = outputs[firstNodeId]?.images?.[0];
+            if (firstImg) {
+                const infoRes = await fetch(`/api/file-info?subfolder=${encodeURIComponent(firstImg.subfolder)}&filename=${encodeURIComponent(firstImg.filename)}`);
+                if (infoRes.ok) {
+                    const info = await infoRes.json();
+                    if (info.mtime) {
+                        timestamp = new Date(info.mtime).getTime() / 1000;
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('获取历史记录文件时间失败:', e);
+        }
+
         for (let nid in item.outputs) {
             item.outputs[nid].images?.forEach(img => {
                 const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
@@ -634,14 +686,14 @@ async function loadHistory() {
                     container.appendChild(infoDiv);
                     
                     const folder = extractFolderFromSubfolder(img.subfolder);
-                    const time = formatPopupTime(item.prompt[0]);
+                    const time = formatPopupTime(timestamp);
                     newEntries.unshift(container);
                     newHistoryImages.unshift(url);
                     newHistoryImageData.unshift({ url, taskId, folder, time });
                 }
             });
         }
-    });
+    }
 
     if (newEntries.length > 0) {
         newEntries.forEach(entry => {
@@ -798,7 +850,7 @@ function toggleModelGalleryDrawer() {
 }
 
 // 渲染模型画廊
-function renderModelGallery() {
+async function renderModelGallery() {
     const list = document.getElementById('modelGalleryList');
     const empty = document.getElementById('modelGalleryEmpty');
 
@@ -811,14 +863,25 @@ function renderModelGallery() {
     empty.classList.add('hidden');
     list.innerHTML = '';
 
+    // 先获取后端已有的封面列表，避免大量 404
+    let coverSet = new Set();
+    try {
+        const res = await fetch('/api/model-covers');
+        if (res.ok) {
+            const data = await res.json();
+            coverSet = new Set(data.covers || []);
+        }
+    } catch (e) {
+        console.error('获取封面列表失败:', e);
+    }
+
     const selectedModel = document.getElementById('modelSelect').value;
 
     config.diffusion_models.forEach(model => {
         const modelValue = typeof model === 'string' ? model : model.value;
         const modelText = typeof model === 'string' ? model : model.text;
-
-        const coverName = modelValue.replace(/\.safetensors$/i, '') + '.png';
-        const coverUrl = `../model-covers/${encodeURIComponent(coverName)}`;
+        const coverBaseName = modelValue.replace(/\.safetensors$/i, '');
+        const hasCover = coverSet.has(coverBaseName);
 
         const item = document.createElement('div');
         item.className = 'flex flex-col gap-2 cursor-pointer group';
@@ -830,12 +893,14 @@ function renderModelGallery() {
         const imgContainer = document.createElement('div');
         imgContainer.className = `aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 relative ${ringClass} transition-all group-hover:ring-2 group-hover:ring-purple-400 group-hover:ring-offset-2 dark:group-hover:ring-offset-slate-800`;
 
-        const img = document.createElement('img');
-        img.src = coverUrl;
-        img.loading = 'lazy';
-        img.className = 'w-full h-full object-cover';
-        img.onerror = function() {
-            this.style.display = 'none';
+        if (hasCover) {
+            const coverUrl = `../model-covers/${encodeURIComponent(coverBaseName)}.png`;
+            const img = document.createElement('img');
+            img.src = coverUrl;
+            img.loading = 'lazy';
+            img.className = 'w-full h-full object-cover';
+            imgContainer.appendChild(img);
+        } else {
             const placeholder = document.createElement('div');
             placeholder.className = 'absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500';
             placeholder.innerHTML = `
@@ -845,9 +910,8 @@ function renderModelGallery() {
                 <span class="text-xs">暂无封面</span>
             `;
             imgContainer.appendChild(placeholder);
-        };
+        }
 
-        imgContainer.appendChild(img);
         item.appendChild(imgContainer);
 
         const nameLabel = document.createElement('div');
