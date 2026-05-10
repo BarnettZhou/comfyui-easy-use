@@ -591,15 +591,18 @@ function renderModelResultGroup(modelResult, isEmpty = false) {
     const header = document.createElement('div');
     header.className = 'px-5 sm:px-6 py-3 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between';
     header.innerHTML = `
-        <div class="flex items-center space-x-2">
-            <div class="w-6 h-6 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+        <div class="flex items-center space-x-2 min-w-0">
+            <div class="w-6 h-6 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
                 <svg class="w-3 h-3 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
                 </svg>
             </div>
-            <span class="font-semibold text-slate-700 dark:text-slate-300 text-sm">${modelResult.modelText}</span>
+            <div class="flex flex-col min-w-0">
+                <span class="font-semibold text-slate-700 dark:text-slate-300 text-sm truncate">${modelResult.modelText}</span>
+                <span class="text-xs text-slate-400 dark:text-slate-500 truncate" title="${modelResult.modelValue}">${modelResult.modelValue}</span>
+            </div>
         </div>
-        <span class="model-image-count text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">0 张</span>
+        <span class="model-image-count text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 flex-shrink-0 ml-2">0 张</span>
     `;
     group.appendChild(header);
 
