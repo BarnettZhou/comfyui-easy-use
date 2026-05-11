@@ -157,46 +157,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initServerConfig();
     initOriginalWorkflow();
     initConsole();
-    initTheme();
 });
-
-// ========== 主题切换功能 ==========
-function toggleTheme() {
-    const html = document.documentElement;
-    const currentTheme = html.classList.contains('dark') ? 'dark' : 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    if (newTheme === 'dark') {
-        html.classList.add('dark');
-    } else {
-        html.classList.remove('dark');
-    }
-    
-    localStorage.setItem('theme', newTheme);
-}
-
-// 初始化主题
-function initTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-    
-    // 监听系统主题变化
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem('theme')) {
-            if (e.matches) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
-    });
-}
 
 // ========== 分辨率提示更新 ==========
 function updateResHint() {

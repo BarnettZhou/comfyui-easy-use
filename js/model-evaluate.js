@@ -17,7 +17,6 @@ let hideProgressTimer = null;
 async function initEvaluate() {
     await initServerConfig();
     await initOriginalWorkflow();
-    initTheme();
     initFormOptions();
     await loadModelCovers();
     renderModelCards();
@@ -1009,38 +1008,6 @@ function showToast(message, duration = 3000) {
     }, duration);
 }
 
-// ==================== 主题切换 ====================
-
-function toggleTheme() {
-    const html = document.documentElement;
-    const currentTheme = html.classList.contains('dark') ? 'dark' : 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    if (newTheme === 'dark') {
-        html.classList.add('dark');
-    } else {
-        html.classList.remove('dark');
-    }
-    localStorage.setItem('theme', newTheme);
-}
-
-function initTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem('theme')) {
-            if (e.matches) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
-    });
-}
 
 // ==================== 页面加载 ====================
 
