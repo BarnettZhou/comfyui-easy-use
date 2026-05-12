@@ -272,45 +272,12 @@ function initTheme() {
     });
 }
 
-// ==================== 全局 Header ====================
-
-function getCurrentPage() {
-    const path = window.location.pathname;
-    if (path === '/' || path === '/index.html') return 'index';
-    if (path.includes('/gallery') && !path.includes('history')) return 'gallery';
-    if (path.includes('/history-gallery')) return 'history-gallery';
-    if (path.includes('/model-evaluate')) return 'model-evaluate';
-    return '';
-}
-
-function initGlobalHeader() {
-    const currentPage = getCurrentPage();
-    
-    // 高亮当前导航tab
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        const tabPage = tab.getAttribute('data-page');
-        if (tabPage === currentPage) {
-            tab.classList.add('bg-primary-600', 'text-white', 'hover:bg-primary-700');
-            tab.classList.remove('text-slate-600', 'dark:text-slate-400', 'hover:bg-slate-100', 'dark:hover:bg-slate-700');
-        }
-    });
-    
-    // 高亮移动端抽屉导航tab
-    document.querySelectorAll('.mobile-nav-tab').forEach(tab => {
-        const tabPage = tab.getAttribute('data-page');
-        if (tabPage === currentPage) {
-            tab.classList.add('bg-primary-50', 'dark:bg-primary-900/30', 'text-primary-700', 'dark:text-primary-400', 'border-l-4', 'border-primary-500');
-            tab.classList.remove('text-slate-600', 'dark:text-slate-400', 'border-l-4', 'border-transparent');
-        }
-    });
-}
-
 // ==================== 移动端抽屉 ====================
 
 function openMobileDrawer() {
     const drawer = document.getElementById('mobileDrawer');
     const overlay = document.getElementById('mobileDrawerOverlay');
-    
+
     if (overlay) {
         overlay.classList.remove('hidden');
         setTimeout(() => overlay.classList.remove('opacity-0'), 10);
@@ -324,7 +291,7 @@ function openMobileDrawer() {
 function closeMobileDrawer() {
     const drawer = document.getElementById('mobileDrawer');
     const overlay = document.getElementById('mobileDrawerOverlay');
-    
+
     if (drawer) {
         drawer.classList.add('-translate-x-full');
     }
@@ -335,14 +302,9 @@ function closeMobileDrawer() {
     document.body.style.overflow = '';
 }
 
-// 页面加载时自动初始化主题和Header
-function runGlobalInit() {
-    initTheme();
-    initGlobalHeader();
-}
-
+// 页面加载时自动初始化主题
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', runGlobalInit);
+    document.addEventListener('DOMContentLoaded', initTheme);
 } else {
-    runGlobalInit();
+    initTheme();
 }
