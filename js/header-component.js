@@ -80,7 +80,7 @@ class ZitHeader extends HTMLElement {
             </div>
 
             <!-- 顶部导航栏 -->
-            <nav class="sticky top-0 z-40 glass border-b ${borderClass} ${navTransition}">
+            <nav class="sticky top-0 z-30 glass border-b ${borderClass} ${navTransition}">
                 <div id="navContainer" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="flex justify-between items-center h-16">
                         <!-- 左侧：汉堡按钮 + Logo -->
