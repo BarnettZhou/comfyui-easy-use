@@ -38,20 +38,23 @@ let imageLazyObserver = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     await initServerConfig();
-    
+
     // 加载无限浏览数据
     loadInfiniteImages();
     loadDateNav();
-    
+
     // 初始化无限滚动
     initInfiniteScroll();
-    
+
     // 点击遮罩关闭预览
     document.getElementById('fullPreview').addEventListener('click', function(event) {
         if (event.target === this) {
             closePreview();
         }
     });
+
+    // 默认开启目录视图
+    toggleFolderFilter();
 });
 
 // ==================== 目录筛选功能 ====================
@@ -1018,59 +1021,9 @@ function initInfiniteScroll() {
     
     infiniteScrollObserver.observe(trigger);
     
-    // 初始化移动端日期导航弹窗的滑动手势
-    initMobileDateNavSwipe();
-}
+    // 移动端日期导航弹窗通过点击遮罩或右上角按钮关闭，不启用滑动手势
+    // 避免滚动列表时误触关闭
 
-/**
- * 初始化移动端日期导航弹窗的滑动手势
- */
-function initMobileDateNavSwipe() {
-    const modal = document.getElementById('mobileDateNavModal');
-    if (!modal) return;
-    
-    const content = modal.querySelector('.absolute.bottom-0');
-    if (!content) return;
-    
-    let startY = 0;
-    let currentY = 0;
-    let isDragging = false;
-    
-    content.addEventListener('touchstart', (e) => {
-        startY = e.touches[0].clientY;
-        isDragging = true;
-        content.style.transition = 'none';
-    }, { passive: true });
-    
-    content.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        currentY = e.touches[0].clientY;
-        const deltaY = currentY - startY;
-        
-        if (deltaY > 0) {
-            content.style.transform = `translateY(${deltaY}px)`;
-        }
-    }, { passive: true });
-    
-    content.addEventListener('touchend', () => {
-        if (!isDragging) return;
-        isDragging = false;
-        
-        const deltaY = currentY - startY;
-        content.style.transition = 'transform 0.3s ease';
-        
-        if (deltaY > 100) {
-            closeMobileDateNav();
-            setTimeout(() => {
-                content.style.transform = '';
-            }, 300);
-        } else {
-            content.style.transform = '';
-        }
-        
-        startY = 0;
-        currentY = 0;
-    });
 }
 
 /**
