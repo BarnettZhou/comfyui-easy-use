@@ -163,12 +163,20 @@
                         </svg>
                         <span>提示词</span>
                     </label>
-                    <button id="promptToggleBtn" onclick="togglePromptHeight()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center space-x-1">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
-                        </svg>
-                        <span>放大</span>
-                    </button>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="clearPrompt()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center space-x-1" title="清空提示词">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            <span>清空</span>
+                        </button>
+                        <button id="promptToggleBtn" onclick="togglePromptHeight()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center space-x-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                            <span>放大</span>
+                        </button>
+                    </div>
                 </div>
                 <textarea id="promptText" rows="3" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl p-4 outline-none input-focus text-sm resize-none placeholder-slate-400 transition-colors duration-300" placeholder="请输入图像生成提示词，描述你想要生成的画面..."></textarea>
             </div>
@@ -260,6 +268,7 @@
                         <select id="ratioSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300" onchange="updateSizeOptions()">
                             <option value="1:1">1:1 正方形</option>
                             <option value="3:4">3:4 竖屏</option>
+                            <option value="4:3">4:3 横屏</option>
                             <option value="custom">自定义大小</option>
                         </select>
                         <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">

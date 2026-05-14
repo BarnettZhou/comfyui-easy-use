@@ -325,7 +325,8 @@ async function queuePrompt() {
         prefix = document.getElementById('filePrefix').value || prefix;
         // 如果prefix中包含%date%，则替换为实际日期
         if (prefix.includes('%date%')) {
-            const date_str = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const date_str = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             prefix = prefix.replace(/%date%/g, date_str);
         }
         const filename_prefix = config.output_dir + "/" + prefix;
@@ -1328,6 +1329,13 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ========== 面板控制 ==========
+// 清空提示词输入框
+function clearPrompt() {
+    const textarea = document.getElementById('promptText');
+    textarea.value = '';
+    showToast('提示词已清空');
+}
+
 // 控制提示词输入框高度
 function togglePromptHeight() {
     const textarea = document.getElementById('promptText');
