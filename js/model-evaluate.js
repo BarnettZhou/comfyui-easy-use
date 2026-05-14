@@ -380,7 +380,8 @@ async function startEvaluation() {
     const [sampler, scheduler] = document.getElementById('samplerSelect').value.split(',');
     const [w, h] = document.getElementById('sizeSelect').value.split(',').map(Number);
     const steps = parseInt(document.getElementById('stepsSelect').value);
-    const dateStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     // 记录任务参数
     const taskParams = {
