@@ -11,13 +11,24 @@
 
 const fs = require('fs');
 const path = require('path');
-const ImageDatabase = require('./db');
+const ImageDatabase = require('../server/db');
 
 // 图片扩展名
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
 
-// easy-use 目录路径
-const EASY_USE_DIR = path.join(__dirname, '..', 'easy-use');
+// 加载配置
+const configPath = path.join(__dirname, '../config/config.json');
+let appConfig = {};
+if (fs.existsSync(configPath)) {
+    try {
+        appConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch (e) {
+        console.error('读取 config.json 失败:', e.message);
+    }
+}
+
+// easy-use 目录路径（优先从 config.json 的 history-gallery 字段读取）
+const EASY_USE_DIR = appConfig['history-gallery'] || path.join(__dirname, '..', 'easy-use');
 
 // 命令行参数
 const args = process.argv.slice(2);

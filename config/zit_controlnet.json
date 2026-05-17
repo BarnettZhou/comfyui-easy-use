@@ -1,0 +1,209 @@
+{
+    "3": {
+        "inputs": {
+            "seed": 590972674340736,
+            "steps": 8,
+            "cfg": 1,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1,
+            "model": [
+                "35",
+                0
+            ],
+            "positive": [
+                "6",
+                0
+            ],
+            "negative": [
+                "11",
+                0
+            ],
+            "latent_image": [
+                "5",
+                0
+            ]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+            "title": "采样"
+        }
+    },
+    "5": {
+        "inputs": {
+            "width": 720,
+            "height": 1280,
+            "batch_size": 1
+        },
+        "class_type": "EmptyLatentImage",
+        "_meta": {
+            "title": "空Latent图像"
+        }
+    },
+    "6": {
+        "inputs": {
+            "text": "一个年轻的中国女性，穿紧身一字肩连衣长裙，站立，双臂环抱。头微微歪向一边，微笑。",
+            "clip": [
+                "30",
+                0
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "提示词"
+        }
+    },
+    "8": {
+        "inputs": {
+            "samples": [
+                "3",
+                0
+            ],
+            "vae": [
+                "32",
+                0
+            ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+            "title": "VAE解码"
+        }
+    },
+    "9": {
+        "inputs": {
+            "filename_prefix": "easy-use/2026-05-17/zit",
+            "images": [
+                "8",
+                0
+            ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+            "title": "生成图像"
+        }
+    },
+    "11": {
+        "inputs": {
+            "conditioning": [
+                "6",
+                0
+            ]
+        },
+        "class_type": "ConditioningZeroOut",
+        "_meta": {
+            "title": "条件零化"
+        }
+    },
+    "25": {
+        "inputs": {
+            "shift": 3,
+            "model": [
+                "34",
+                0
+            ]
+        },
+        "class_type": "ModelSamplingAuraFlow",
+        "_meta": {
+            "title": "采样算法（AuraFlow）"
+        }
+    },
+    "30": {
+        "inputs": {
+            "clip_name": "qwen_3_4b.safetensors",
+            "type": "lumina2",
+            "device": "default"
+        },
+        "class_type": "CLIPLoader",
+        "_meta": {
+            "title": "加载CLIP"
+        }
+    },
+    "32": {
+        "inputs": {
+            "vae_name": "flux_vae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+            "title": "加载VAE"
+        }
+    },
+    "34": {
+        "inputs": {
+            "unet_name": "redcraftRedzimage_unet.safetensors",
+            "weight_dtype": "default"
+        },
+        "class_type": "UNETLoader",
+        "_meta": {
+            "title": "UNet加载器"
+        }
+    },
+    "35": {
+        "inputs": {
+            "strength": 0.5,
+            "model": [
+                "25",
+                0
+            ],
+            "model_patch": [
+                "41",
+                0
+            ],
+            "vae": [
+                "32",
+                0
+            ],
+            "image": [
+                "38",
+                0
+            ]
+        },
+        "class_type": "QwenImageDiffsynthControlnet",
+        "_meta": {
+            "title": "QwenImageDiffsynthControlnet"
+        }
+    },
+    "38": {
+        "inputs": {
+            "preprocessor": "DepthAnythingPreprocessor",
+            "resolution": 512,
+            "image": [
+                "39",
+                0
+            ]
+        },
+        "class_type": "AIO_Preprocessor",
+        "_meta": {
+            "title": "AIO Aux Preprocessor"
+        }
+    },
+    "39": {
+        "inputs": {
+            "image": "demo-controlnet.png"
+        },
+        "class_type": "LoadImage",
+        "_meta": {
+            "title": "加载参考图像"
+        }
+    },
+    "40": {
+        "inputs": {
+            "images": [
+                "38",
+                0
+            ]
+        },
+        "class_type": "PreviewImage",
+        "_meta": {
+            "title": "预览预处理结果"
+        }
+    },
+    "41": {
+        "inputs": {
+            "name": "Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors"
+        },
+        "class_type": "ModelPatchLoader",
+        "_meta": {
+            "title": "加载模型补丁"
+        }
+    }
+}

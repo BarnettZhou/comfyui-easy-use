@@ -18,7 +18,7 @@ try {
     }
 }
 
-const DB_PATH = path.join(__dirname, 'storage', 'images.db');
+const DB_PATH = path.join(__dirname, '../storage', 'images.db');
 
 // 判断是 better-sqlite3 还是 sqlite3
 const isBetterSQLite3 = Database.name === 'Database' && Database.prototype.constructor.name === 'Database';

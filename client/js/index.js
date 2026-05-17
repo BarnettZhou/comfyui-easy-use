@@ -20,7 +20,7 @@ window.addEventListener('beforeunload', stopHistoryPolling);
 async function initOriginalWorkflow() {
     try {
         // 加载原始工作流
-        const workflowResponse = await fetch('../original_workflow.json');
+        const workflowResponse = await fetch('../config/original_workflow.json');
         originalWorkflow = await workflowResponse.json();
         console.log('原始工作流:', originalWorkflow);
     } catch (error) {

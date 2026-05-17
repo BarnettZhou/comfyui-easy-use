@@ -583,7 +583,7 @@ async function setAsModelCover() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                sourcePath: `easy-use/${file.path}`,
+                sourcePath: file.path,
                 modelName: modelName
             })
         });

@@ -19,21 +19,33 @@
 
 ```
 zit-easy-use/
-├── pages/
-│   ├── index.html              # 文生图主页面
-│   ├── gallery.html            # 图片库页面
-│   └── history-gallery.html    # 历史图片浏览页面（支持双视图模式）
-├── js/
-│   ├── index.js                # 主页面逻辑
-│   ├── gallery.js              # 图片库逻辑
-│   ├── history-gallery.js      # 历史浏览逻辑（含无限浏览模式）
-│   ├── common.js               # 公共工具函数
-│   └── tailwind.js             # Tailwind CSS 配置
-├── serve.js                    # Node.js 服务器
-├── db.js                       # SQLite 数据库模块
-├── scan-images.js              # 图片全量扫描脚本
-├── config.json                 # 配置文件
-└── readme.md                   # 本文档
+├── client/
+│   ├── pages/
+│   │   ├── index.html              # 文生图主页面
+│   │   ├── gallery.html            # 图片库页面
+│   │   ├── history-gallery.html    # 历史图片浏览页面（支持双视图模式）
+│   │   └── model-evaluate.html     # 模型测评页面
+│   └── js/
+│       ├── index.js                # 主页面逻辑
+│       ├── gallery.js              # 图片库逻辑
+│       ├── history-gallery.js      # 历史浏览逻辑（含无限浏览模式）
+│       ├── model-evaluate.js       # 模型测评逻辑
+│       ├── common.js               # 公共工具函数
+│       ├── header-component.js     # 共享导航栏 Web Component
+│       └── tailwind.js             # Tailwind CSS 配置
+├── server/
+│   ├── serve.js                    # Node.js 服务器
+│   ├── db.js                       # SQLite 数据库模块
+│   └── init-db.js                  # 数据库初始化脚本
+├── bin/
+│   └── scan-images.js              # 图片全量扫描脚本
+├── config/
+│   ├── config.json                 # 配置文件
+│   ├── example-config.json         # 配置文件模板
+│   └── original_workflow.json      # ComfyUI 工作流模板
+├── storage/                        # 运行时数据目录
+├── resources/                      # 静态资源
+└── readme.md                       # 本文档
 ```
 
 ## 快速开始
@@ -58,7 +70,7 @@ npm install
 复制配置文件模板：
 
 ```bash
-cp example-config.json config.json
+cp config/example-config.json config/config.json
 ```
 
 编辑 `config.json`，配置你的 ComfyUI 服务器地址和模型信息。
@@ -66,7 +78,7 @@ cp example-config.json config.json
 ### 4. 启动
 
 ```bash
-node serve.js
+node server/serve.js
 ```
 
 访问 http://localhost:11451 即可使用。
@@ -140,18 +152,18 @@ node serve.js
 
 ```bash
 # 全量扫描 - 扫描 easy-use 目录下所有图片
-node scan-images.js
+node bin/scan-images.js
 
 # 近期扫描 - 只扫描最近两天的目录（与自动扫描相同）
-node scan-images.js --recent
+node bin/scan-images.js --recent
 
 # 检查清理 - 扫描并清理数据库中不存在的记录
-node scan-images.js --check
+node bin/scan-images.js --check
 ```
 
 ### 数据库文件
 
-- 数据库文件：`images.db`（自动创建在项目根目录）
+- 数据库文件：`storage/images.db`（自动创建）
 - 使用 `better-sqlite3` 驱动，支持 WAL 模式提高性能
 
 ## API 接口

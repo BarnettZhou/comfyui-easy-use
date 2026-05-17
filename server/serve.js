@@ -57,22 +57,32 @@ function parseArgs() {
 const PORT = parseArgs();
 const HOST = '0.0.0.0'; // 允许所有设备访问
 
-// easy-use 目录路径
-const EASY_USE_DIR = path.join(__dirname, '..', 'easy-use');
-
 // 检查config.json文件是否存在
-const configPath = path.join(__dirname, 'config.json');
+const configPath = path.join(__dirname, '../config/config.json');
 
 if (!fs.existsSync(configPath)) {
     console.log('\n错误：未找到config.json配置文件！');
     console.log('\n请按照以下步骤配置：');
-    console.log('1. 复制 example-config.json 文件');
+    console.log('1. 复制 config/example-config.json 文件');
     console.log('2. 将其重命名为 config.json');
     console.log('3. 根据实际情况修改配置内容');
     console.log('4. 重新启动本服务\n');
-    console.log('提示：example-config.json 文件应位于当前目录下\n');
+    console.log('提示：example-config.json 文件应位于 config/ 目录下\n');
     process.exit(1);
 }
+
+// 加载配置
+let appConfig;
+try {
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    appConfig = JSON.parse(configContent);
+} catch (e) {
+    console.error('读取 config.json 失败:', e.message);
+    process.exit(1);
+}
+
+// easy-use 目录路径（优先从 config.json 的 history-gallery 字段读取）
+const EASY_USE_DIR = appConfig['history-gallery'] || path.join(__dirname, '..', 'easy-use');
 
 // 支持的MIME类型
 const mimeTypes = {
@@ -367,7 +377,7 @@ const server = http.createServer((req, res) => {
             let dirParam = req.url.replace('/api/easy-use/structure', '').replace(/^\//, '');
             
             // 构建目标路径
-            const basePath = path.join(__dirname, '..', 'easy-use');
+            const basePath = EASY_USE_DIR;
             let targetPath = basePath;
             
             // 如果传入了目录参数，则使用传入的目录
@@ -435,7 +445,7 @@ const server = http.createServer((req, res) => {
                 return;
             }
             
-            const targetPath = path.join(__dirname, '..', 'easy-use', dirPath);
+            const targetPath = path.join(EASY_USE_DIR, dirPath);
             
             // 检查路径是否存在且是目录
             if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isDirectory()) {
@@ -488,7 +498,7 @@ const server = http.createServer((req, res) => {
                 return;
             }
             
-            const targetPath = path.join(__dirname, '..', 'easy-use', filePath);
+            const targetPath = path.join(EASY_USE_DIR, filePath);
             
             // 检查文件是否存在
             if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
@@ -522,7 +532,7 @@ const server = http.createServer((req, res) => {
     // 获取模型封面列表
     if (req.url === '/api/model-covers' && req.method === 'GET') {
         try {
-            const coverDir = path.join(__dirname, 'storage', 'model-covers');
+            const coverDir = path.join(__dirname, '../storage', 'model-covers');
             let covers = [];
             if (fs.existsSync(coverDir)) {
                 const items = fs.readdirSync(coverDir);
@@ -566,8 +576,9 @@ const server = http.createServer((req, res) => {
                 return;
             }
             
-            // 从项目根目录的上一级（ComfyUI output 目录）开始查找
-            const filePath = path.join(__dirname, '..', relativePath);
+            // 基于 EASY_USE_DIR 查找文件，兼容 easy-use/ 前缀
+            const subPath = normalizedSubfolder.replace(/^easy-use\/?/, '');
+            const filePath = subPath ? path.join(EASY_USE_DIR, subPath, filename) : path.join(EASY_USE_DIR, filename);
             if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: '文件不存在' }), 'utf-8');
@@ -602,7 +613,7 @@ const server = http.createServer((req, res) => {
                 }
 
                 // evaluate 目录在项目根目录的同级
-                const evaluateDir = path.join(__dirname, 'storage', 'evaluate');
+                const evaluateDir = path.join(__dirname, '../storage', 'evaluate');
                 if (!fs.existsSync(evaluateDir)) {
                     fs.mkdirSync(evaluateDir, { recursive: true });
                 }
@@ -665,15 +676,16 @@ const server = http.createServer((req, res) => {
                     return;
                 }
                 
-                // 从项目根目录的上一级（ComfyUI output 目录）开始查找
-                const sourceFullPath = path.join(__dirname, '..', normalizedSourcePath);
+                // 基于 EASY_USE_DIR 查找源文件，兼容 easy-use/ 前缀
+                const sourceSubPath = normalizedSourcePath.replace(/^easy-use\/?/, '');
+                const sourceFullPath = path.join(EASY_USE_DIR, sourceSubPath);
                 if (!fs.existsSync(sourceFullPath) || !fs.statSync(sourceFullPath).isFile()) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: '源文件不存在' }), 'utf-8');
                     return;
                 }
                 
-                const coverDir = path.join(__dirname, 'storage', 'model-covers');
+                const coverDir = path.join(__dirname, '../storage', 'model-covers');
                 if (!fs.existsSync(coverDir)) {
                     fs.mkdirSync(coverDir, { recursive: true });
                 }
@@ -703,7 +715,7 @@ const server = http.createServer((req, res) => {
                 res.end('Bad Request');
                 return;
             }
-            const targetPath = path.join(__dirname, 'storage', 'model-covers', filePathParam);
+            const targetPath = path.join(__dirname, '../storage', 'model-covers', filePathParam);
             if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
                 res.writeHead(404);
                 res.end('Not Found');
@@ -729,7 +741,15 @@ const server = http.createServer((req, res) => {
 
     // 处理文件路径
     let filePath = routes[req.url] || req.url;
-    filePath = path.join(__dirname, filePath);
+    
+    // 映射路径到新的目录结构
+    if (filePath.startsWith('/js/')) {
+        filePath = filePath.replace('/js/', '/client/js/');
+    } else if (filePath.startsWith('/pages/')) {
+        filePath = filePath.replace('/pages/', '/client/pages/');
+    }
+    
+    filePath = path.join(__dirname, '..', filePath);
     
     // 获取文件扩展名
     const extname = path.extname(filePath);
@@ -779,7 +799,7 @@ server.listen(PORT, HOST, () => {
     
     // 启动时执行一次全量扫描
     console.log('[启动] 正在执行初始扫描...');
-    exec('node scan-images.js --recent', (error, stdout, stderr) => {
+    exec('node bin/scan-images.js --recent', (error, stdout, stderr) => {
         if (error) {
             console.error('[启动扫描错误]', error);
         } else {

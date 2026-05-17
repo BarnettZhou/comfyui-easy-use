@@ -37,7 +37,7 @@ async function loadModelCovers() {
 
 async function initOriginalWorkflow() {
     try {
-        const workflowResponse = await fetch('../original_workflow.json');
+        const workflowResponse = await fetch('../config/original_workflow.json');
         originalWorkflow = await workflowResponse.json();
     } catch (error) {
         console.error('加载原始工作流失败:', error);

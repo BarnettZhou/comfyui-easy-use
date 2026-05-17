@@ -1,12 +1,12 @@
 {
   "name": "zit-easy-use",
   "scripts": {
-    "serve": "node serve.js",
-    "scan": "node scan-images.js",
-    "scan:recent": "node scan-images.js --recent",
-    "scan:check": "node scan-images.js --check",
-    "scan:fix": "node scan-images.js --fix",
-    "init-db": "node init-db.js"
+    "serve": "node server/serve.js",
+    "scan": "node bin/scan-images.js",
+    "scan:recent": "node bin/scan-images.js --recent",
+    "scan:check": "node bin/scan-images.js --check",
+    "scan:fix": "node bin/scan-images.js --fix",
+    "init-db": "node server/init-db.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2"

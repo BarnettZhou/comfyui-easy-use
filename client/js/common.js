@@ -15,7 +15,7 @@ let COMFYUI_SERVER;
 async function initServerConfig() {
     try {
         // 加载服务器配置
-        const configResponse = await fetch('../config.json');
+        const configResponse = await fetch('../config/config.json');
         config = await configResponse.json();
 
         // 获取本地IP地址（用于本服务）
