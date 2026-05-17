@@ -103,3 +103,4 @@ out/
 # ====================
 storage/
 model-covers/
+cache/

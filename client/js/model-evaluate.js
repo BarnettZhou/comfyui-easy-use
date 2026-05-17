@@ -37,7 +37,7 @@ async function loadModelCovers() {
 
 async function initOriginalWorkflow() {
     try {
-        const workflowResponse = await fetch('../config/original_workflow.json');
+        const workflowResponse = await fetch('../config/workflow.json');
         originalWorkflow = await workflowResponse.json();
     } catch (error) {
         console.error('加载原始工作流失败:', error);
@@ -441,14 +441,12 @@ async function startEvaluation() {
                 p['34'].inputs.unet_name = modelValue;
                 p['32'].inputs.vae_name = vae;
 
-                // 删除放大相关节点
+                // 删除 ControlNet 相关节点
+                delete p['35'];
                 delete p['38'];
                 delete p['39'];
-                delete p['40'];
-                delete p['42'];
+                delete p['41'];
 
-                // 删除LoRA
-                delete p['44'];
                 p['25'].inputs.shift = 3;
                 p['25'].inputs.model = ['34', 0];
 

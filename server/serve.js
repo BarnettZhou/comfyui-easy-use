@@ -653,6 +653,111 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 上传 Control 参考图片
+    if (req.url === '/api/upload-image' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { image } = JSON.parse(body);
+                if (!image) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '缺少图片数据' }), 'utf-8');
+                    return;
+                }
+
+                // 解析 base64: data:image/png;base64,xxxx
+                const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
+                if (!match) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '无效的图片格式' }), 'utf-8');
+                    return;
+                }
+
+                const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+                const base64Data = match[2];
+                const buffer = Buffer.from(base64Data, 'base64');
+
+                // 确保 cache 目录存在
+                const cacheDir = path.join(__dirname, '..', 'cache');
+                if (!fs.existsSync(cacheDir)) {
+                    fs.mkdirSync(cacheDir, { recursive: true });
+                }
+
+                // 生成文件名: img_loader_YYYY-MM-DD_HH-mm-ss.ext
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                const datetime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                const filename = `img_loader_${datetime}.${ext}`;
+                const filePath = path.join(cacheDir, filename);
+
+                fs.writeFileSync(filePath, buffer);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, path: filePath }), 'utf-8');
+            } catch (error) {
+                console.error('[API] 上传图片失败:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '上传图片失败' }), 'utf-8');
+            }
+        });
+        return;
+    }
+
+    // 读取图片（用于恢复 Control 参考图预览）
+    if (req.url.startsWith('/api/read-image')) {
+        try {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const imagePath = url.searchParams.get('path') || '';
+
+            if (!imagePath) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '缺少 path 参数' }), 'utf-8');
+                return;
+            }
+
+            let targetPath;
+
+            // 如果是绝对路径且存在，直接使用
+            if (path.isAbsolute(imagePath) && fs.existsSync(imagePath)) {
+                targetPath = imagePath;
+            } else {
+                // 否则在项目 cache 目录下查找
+                const cacheDir = path.join(__dirname, '..', 'cache');
+                const cachedPath = path.join(cacheDir, path.basename(imagePath));
+                if (fs.existsSync(cachedPath)) {
+                    targetPath = cachedPath;
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '图片不存在' }), 'utf-8');
+                    return;
+                }
+            }
+
+            // 安全检查：防止路径遍历
+            const resolvedPath = path.resolve(targetPath);
+            const cacheDir = path.resolve(path.join(__dirname, '..', 'cache'));
+            const easyUseDir = path.resolve(EASY_USE_DIR);
+            if (!resolvedPath.startsWith(cacheDir) && !resolvedPath.startsWith(easyUseDir)) {
+                res.writeHead(403, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '禁止访问该路径' }), 'utf-8');
+                return;
+            }
+
+            const extname = path.extname(targetPath);
+            const contentType = mimeTypes[extname] || 'application/octet-stream';
+            const content = fs.readFileSync(targetPath);
+
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(content);
+        } catch (error) {
+            console.error('[API] 读取图片失败:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '读取图片失败' }), 'utf-8');
+        }
+        return;
+    }
+
     // 设置模型封面
     if (req.url === '/api/set-model-cover' && req.method === 'POST') {
         let body = '';

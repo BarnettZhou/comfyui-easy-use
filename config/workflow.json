@@ -1,14 +1,14 @@
 {
   "3": {
     "inputs": {
-      "seed": 914642622064415,
-      "steps": 9,
+      "seed": 1072415564277516,
+      "steps": 8,
       "cfg": 1,
-      "sampler_name": "er_sde",
-      "scheduler": "sgm_uniform",
+      "sampler_name": "euler",
+      "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "25",
+        "35",
         0
       ],
       "positive": [
@@ -26,13 +26,13 @@
     },
     "class_type": "KSampler",
     "_meta": {
-      "title": "初步采样"
+      "title": "采样"
     }
   },
   "5": {
     "inputs": {
-      "width": 904,
-      "height": 1200,
+      "width": 720,
+      "height": 1280,
       "batch_size": 1
     },
     "class_type": "EmptyLatentImage",
@@ -42,7 +42,7 @@
   },
   "6": {
     "inputs": {
-      "text": "",
+      "text": "一个年轻的中国女性，穿紧身一字肩连衣长裙，站立，双臂环抱。头微微歪向一边，微笑。",
       "clip": [
         "30",
         0
@@ -66,12 +66,12 @@
     },
     "class_type": "VAEDecode",
     "_meta": {
-      "title": "初步解码"
+      "title": "VAE解码"
     }
   },
   "9": {
     "inputs": {
-      "filename_prefix": "dark-beast/2025-12-29/db-zit",
+      "filename_prefix": "easy-use/2026-05-17/zit",
       "images": [
         "8",
         0
@@ -79,7 +79,7 @@
     },
     "class_type": "SaveImage",
     "_meta": {
-      "title": "初步图像"
+      "title": "生成图像"
     }
   },
   "11": {
@@ -98,7 +98,7 @@
     "inputs": {
       "shift": 3,
       "model": [
-        "44",
+        "34",
         0
       ]
     },
@@ -120,7 +120,7 @@
   },
   "32": {
     "inputs": {
-      "vae_name": "dark-beast-ae.sft"
+      "vae_name": "flux_vae.safetensors"
     },
     "class_type": "VAELoader",
     "_meta": {
@@ -129,7 +129,7 @@
   },
   "34": {
     "inputs": {
-      "unet_name": "darkBeastZDBZUpdatedDEC21_dbzAIOV10.safetensors",
+      "unet_name": "redcraftRedzimage_unet.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -137,91 +137,61 @@
       "title": "UNet加载器"
     }
   },
-  "38": {
+  "35": {
     "inputs": {
-      "upscale_method": "bislerp",
-      "scale_by": 1.5,
-      "samples": [
-        "3",
+      "strength": 0.5,
+      "model": [
+        "25",
         0
-      ]
-    },
-    "class_type": "LatentUpscaleBy",
-    "_meta": {
-      "title": "缩放Latent"
-    }
-  },
-  "39": {
-    "inputs": {
-      "samples": [
-        "40",
+      ],
+      "model_patch": [
+        "41",
         0
       ],
       "vae": [
         "32",
         0
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "最终解码"
-    }
-  },
-  "40": {
-    "inputs": {
-      "seed": 914642622064415,
-      "steps": 9,
-      "cfg": 1,
-      "sampler_name": "er_sde",
-      "scheduler": "sgm_uniform",
-      "denoise": 0.8,
-      "model": [
-        "25",
-        0
       ],
-      "positive": [
-        "6",
-        0
-      ],
-      "negative": [
-        "11",
-        0
-      ],
-      "latent_image": [
+      "image": [
         "38",
         0
       ]
     },
-    "class_type": "KSampler",
+    "class_type": "QwenImageDiffsynthControlnet",
     "_meta": {
-      "title": "二次采样"
+      "title": "QwenImageDiffsynthControlnet"
     }
   },
-  "42": {
+  "38": {
     "inputs": {
-      "filename_prefix": "dark-beast/2025-12-29/db-zit",
-      "images": [
+      "preprocessor": "DepthAnythingPreprocessor",
+      "resolution": 512,
+      "image": [
         "39",
         0
       ]
     },
-    "class_type": "SaveImage",
+    "class_type": "AIO_Preprocessor",
     "_meta": {
-      "title": "最终图像"
+      "title": "AIO Aux Preprocessor"
     }
   },
-  "44": {
+  "39": {
     "inputs": {
-      "lora_name": "Mystic-XXX-ZIT-v2.safetensors",
-      "strength_model": 0.5,
-      "model": [
-        "34",
-        0
-      ]
+      "image": "demo-controlnet.png"
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "LoadImage",
     "_meta": {
-      "title": "Lora加载"
+      "title": "加载参考图像"
+    }
+  },
+  "41": {
+    "inputs": {
+      "name": "Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors"
+    },
+    "class_type": "ModelPatchLoader",
+    "_meta": {
+      "title": "加载模型补丁"
     }
   }
 }

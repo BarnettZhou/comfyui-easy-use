@@ -19,10 +19,10 @@ window.addEventListener('beforeunload', stopHistoryPolling);
 // 初始化原始工作流
 async function initOriginalWorkflow() {
     try {
-        // 加载原始工作流
-        const workflowResponse = await fetch('../config/original_workflow.json');
+        // 加载工作流模板（内置 Control 节点）
+        const workflowResponse = await fetch('../config/workflow.json');
         originalWorkflow = await workflowResponse.json();
-        console.log('原始工作流:', originalWorkflow);
+        console.log('工作流模板:', originalWorkflow);
     } catch (error) {
         console.error('加载原始工作流失败:', error);
         showToast('加载原始工作流失败，请检查服务器是否正常运行');
@@ -62,14 +62,29 @@ async function initConsole() {
             vaeSelect.appendChild(option);
         });
 
-        // 初始化LoRA模型下拉选项
-        const loraSelect = document.getElementById('loraModel');
-        loraSelect.innerHTML = '';
-        config.loras.forEach(lora => {
+        // 初始化补丁模型下拉选项
+        const patchSelect = document.getElementById('controlPatchModel');
+        patchSelect.innerHTML = '';
+        config.modal_patchs.forEach(patch => {
             const option = document.createElement('option');
-            option.value = lora;
-            option.textContent = lora;
-            loraSelect.appendChild(option);
+            if (typeof patch === 'string') {
+                option.value = patch;
+                option.textContent = patch;
+            } else {
+                option.value = patch.value;
+                option.textContent = patch.text;
+            }
+            patchSelect.appendChild(option);
+        });
+
+        // 初始化预处理类型下拉选项
+        const preprocessorSelect = document.getElementById('controlPreprocessor');
+        preprocessorSelect.innerHTML = '';
+        config.preprocessors.forEach(pp => {
+            const option = document.createElement('option');
+            option.value = pp;
+            option.textContent = pp;
+            preprocessorSelect.appendChild(option);
         });
 
         // 初始化采样器组合下拉选项
@@ -102,42 +117,36 @@ async function initConsole() {
 function setupWebSocket() {
     const wsUrl = COMFYUI_SERVER.replace('http', 'ws') + '/ws?clientId=easy_gen_client';
     socket = new WebSocket(wsUrl);
+    socket.binaryType = 'arraybuffer';
 
     socket.onmessage = (event) => {
         if (typeof event.data === 'string') {
             const msg = JSON.parse(event.data);
 
             if (msg.type === 'progress') {
-                const { value, max, node } = msg.data;
+                const { value, max } = msg.data;
                 const percent = Math.round((value / max) * 100) + '%';
-                
-                // 根据 original_workflow.json 节点 ID 分配进度
-                if (node === "3") { // 初步采样节点
-                    document.getElementById('progress1').style.width = percent;
-                    document.getElementById('progressText1').innerText = percent;
-                    document.getElementById('progressSection2').classList.add('opacity-50');
-                } else if (node === "40") { // 二次采样节点
-                    document.getElementById('progress2').style.width = percent;
-                    document.getElementById('progressText2').innerText = percent;
-                    document.getElementById('progressSection2').classList.remove('opacity-50');
-                }
+                document.getElementById('progress1').style.width = percent;
+                document.getElementById('progressText1').innerText = percent;
             }
 
             if (msg.type === 'execution_start') {
                 resetProgress();
             }
-            
-            if (msg.type === 'executing' && msg.data.node === null) {
-                // 队列中所有任务执行完毕
-                // 如果当前有新任务在运行，不隐藏进度条（避免旧任务的延迟事件影响新任务）
-                if (isGenerating) return;
-                if (hideProgressTimer) clearTimeout(hideProgressTimer);
-                hideProgressTimer = setTimeout(() => {
-                    document.getElementById('progressContainer').classList.add('hidden');
-                }, 2000);
-            }
         } else {
-            // pass
+            // 二进制预览图片（ComfyUI 前 8 字节为头部，图片数据从第 9 字节开始）
+            const imageData = event.data.slice(8);
+            const blob = new Blob([imageData], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            const previewImg = document.getElementById('livePreview');
+            const previewContainer = document.getElementById('livePreviewContainer');
+
+            if (previewImg.dataset.lastUrl) {
+                URL.revokeObjectURL(previewImg.dataset.lastUrl);
+            }
+            previewImg.dataset.lastUrl = url;
+            previewImg.src = url;
+            previewContainer.classList.remove('hidden');
         }
     };
 
@@ -146,10 +155,17 @@ function setupWebSocket() {
 
 function resetProgress() {
     document.getElementById('progress1').style.width = '0%';
-    document.getElementById('progress2').style.width = '0%';
     document.getElementById('progressText1').innerText = '0%';
-    document.getElementById('progressText2').innerText = '0%';
-    document.getElementById('progressSection2').classList.add('opacity-50');
+
+    // 清空预览图
+    const previewImg = document.getElementById('livePreview');
+    const previewContainer = document.getElementById('livePreviewContainer');
+    if (previewImg.dataset.lastUrl) {
+        URL.revokeObjectURL(previewImg.dataset.lastUrl);
+        delete previewImg.dataset.lastUrl;
+    }
+    previewImg.src = '';
+    previewContainer.classList.add('hidden');
 }
 
 // 页面加载完成后初始化
@@ -161,21 +177,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 // ========== 分辨率提示更新 ==========
 function updateResHint() {
-    const ratio = document.getElementById('ratioSelect').value;
-    const scale = parseFloat(document.getElementById('upscaleScale').value);
-    let w, h;
-    
-    if (ratio === 'custom') {
-        // 自定义大小：从输入框获取值
-        w = parseInt(document.getElementById('widthInput').value) || 0;
-        h = parseInt(document.getElementById('heightInput').value) || 0;
-    } else {
-        // 预设比例：从下拉框获取值
-        const sizeValue = document.getElementById('sizeSelect').value;
-        [w, h] = sizeValue ? sizeValue.split(',').map(Number) : [0, 0];
-    }
-    
-    document.getElementById('targetRes').innerText = `${Math.round(w * scale)} x ${Math.round(h * scale)}`;
+    // 图片放大已移除，此函数保留空实现以兼容现有调用
 }
 
 // 获取尺寸映射
@@ -245,8 +247,7 @@ async function queuePrompt() {
         hideProgressTimer = null;
     }
     
-    // 显示进度条并重置进度
-    document.getElementById('progressContainer').classList.remove('hidden');
+    // 重置进度和预览
     resetProgress();
     
     const btn = document.getElementById('generateBtn');
@@ -297,28 +298,18 @@ async function queuePrompt() {
         p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
         p["32"].inputs.vae_name = document.getElementById('vaeSelect').value;
 
-        // 放大处理
-        if(!document.getElementById('upscaleEnable').checked) {
-            delete p["38"]; delete p["39"]; delete p["40"]; delete p["42"];
+        // Control 处理
+        if (document.getElementById('controlEnable').checked) {
+            // 设置 Control 参数（节点已存在于工作流模板中）
+            p["35"].inputs.strength = parseFloat(document.getElementById('controlStrength').value);
+            p["38"].inputs.preprocessor = document.getElementById('controlPreprocessor').value;
+            p["38"].inputs.resolution = parseInt(document.getElementById('controlResolution').value);
+            p["39"].inputs.image = document.getElementById('controlImagePath').value;
+            p["41"].inputs.name = document.getElementById('controlPatchModel').value;
         } else {
-            p["38"].inputs.scale_by = parseFloat(document.getElementById('upscaleScale').value);
-            p["40"].inputs.seed = seed;
-            p["40"].inputs.sampler_name = sampler;
-            p["40"].inputs.scheduler = scheduler;
-            p["40"].inputs.denoise = parseFloat(document.getElementById('denoiseValue').value);
-            p["40"].inputs.cfg = parseFloat(document.getElementById('cfgInput').value);
-            p["40"].inputs.steps = parseInt(document.getElementById('stepsInput').value);
-        }
-
-        // LoRA处理
-        if(document.getElementById('loraEnable').checked) {
-            p["44"].inputs.lora_name = document.getElementById('loraModel').value;
-            p["44"].inputs.strength_model = parseFloat(document.getElementById('loraStrength').value);
-            p["25"].inputs.shift = 22; // mystic-xxx-zit-v2 的特殊参数
-        } else {
-            delete p["44"];
-            p["25"].inputs.shift = 3;
-            p["25"].inputs.model = ["34", 0]
+            // 未启用 Control 时删除节点，恢复采样直连
+            delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"];
+            p["3"].inputs.model = ["25", 0];
         }
 
         // 文件前缀处理
@@ -331,7 +322,6 @@ async function queuePrompt() {
         }
         const filename_prefix = config.output_dir + "/" + prefix;
         p["9"].inputs.filename_prefix = filename_prefix;
-        if (p["42"]) p["42"].inputs.filename_prefix = filename_prefix;
 
         for(let i = 0; i < batchCount; i++) {
             if (shouldStop) break; 
@@ -347,7 +337,6 @@ async function queuePrompt() {
 
             // 简单的种子递增，防止批量生成的图一模一样
             p["3"].inputs.seed += 1;
-            if(p["40"]) p["40"].inputs.seed = p["3"].inputs.seed;
         }
 
     } catch (e) {
@@ -359,12 +348,7 @@ async function queuePrompt() {
         btn.innerText = originalText;
         btn.classList.add('hover:bg-blue-700');
         
-        // 所有任务执行完毕后隐藏进度条
-        if (hideProgressTimer) clearTimeout(hideProgressTimer);
-        hideProgressTimer = setTimeout(() => {
-            document.getElementById('progressContainer').classList.add('hidden');
-            hideProgressTimer = null;
-        }, 2000);
+        // 面板常显，任务结束后保持当前进度和预览
     }
 }
 
@@ -411,10 +395,11 @@ function trackTask(id) {
                 if(data[id]) {
                     clearInterval(timer);
                     
+                    const outputs = data[id].outputs;
+                    
                     // 尝试从文件系统获取真实的创建时间，替代不稳定的 prompt[0]
                     let timestamp = data[id].prompt[0];
                     try {
-                        const outputs = data[id].outputs;
                         const firstNodeId = Object.keys(outputs)[0];
                         const firstImg = outputs[firstNodeId]?.images?.[0];
                         if (firstImg) {
@@ -460,15 +445,18 @@ function renderImg(outputs, timestamp) {
     let imageCount = container.children.length;
 
     for (let nodeId of nodeIds) {
+        if (!outputs[nodeId] || !outputs[nodeId].images) {
+            continue;
+        }
         outputs[nodeId].images.forEach(img => {
             const url = `${COMFYUI_SERVER}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
             const folder = extractFolderFromSubfolder(img.subfolder);
             const time = formatPopupTime(timestamp);
             
-            // 存储图片额外信息，供 popup 使用
             const wrapperEl = document.createElement('div');
             wrapperEl.dataset.folder = folder;
             wrapperEl.dataset.time = time;
+            wrapperEl.dataset.nodeId = nodeId;
             wrapperEl.className = 'relative group animate-fade-in';
             
             const imgWrapper = document.createElement('div');
@@ -487,7 +475,7 @@ function renderImg(outputs, timestamp) {
             
             const label = document.createElement('span');
             label.className = 'absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm pointer-events-none';
-            label.textContent = nodeId == '39' || nodeId == '42' ? '高清大图' : '预览草图';
+            label.textContent = '生成结果';
             
             const overlay = document.createElement('div');
             overlay.className = 'absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl pointer-events-none';
@@ -500,7 +488,7 @@ function renderImg(outputs, timestamp) {
             imageCount++;
         });
     }
-    
+
     if (resultCount) {
         resultCount.textContent = imageCount + ' 张';
     }
@@ -575,9 +563,6 @@ async function loadHistory() {
                     const imgWrapper = document.createElement('div');
                     imgWrapper.className = 'relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 group cursor-pointer';
                     
-                    const isLargeImage = nid === '39' || nid === '42';
-                    const labelColor = isLargeImage ? 'bg-purple-500' : 'bg-primary-500';
-                    
                     const imgEl = document.createElement('img');
                     imgEl.src = url;
                     imgEl.loading = 'lazy';
@@ -589,9 +574,9 @@ async function loadHistory() {
                     imgWrapper.appendChild(imgEl);
                     
                     const label = document.createElement('span');
-                    label.className = `absolute top-2 right-2 ${labelColor} text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm pointer-events-none`;
+                    label.className = 'absolute top-2 right-2 bg-primary-500 text-white text-xs px-2 py-1 rounded-lg backdrop-blur-sm pointer-events-none';
                     label.style.pointerEvents = 'none';
-                    label.textContent = isLargeImage ? '高清' : '预览';
+                    label.textContent = '生成';
                     imgWrapper.appendChild(label);
                     
                     const overlay = document.createElement('div');
@@ -1081,26 +1066,23 @@ async function fillFormFromPromptData(promptData) {
         document.getElementById('samplerSelect').value = samplerValue;
     }
 
-    // 图片放大设置
-    if (promptData["38"] && promptData["38"].inputs.scale_by) {
-        document.getElementById('upscaleEnable').checked = true;
-        document.getElementById('upscaleScale').value = promptData["38"].inputs.scale_by;
-        updateResHint();
+    // Control 设置
+    if (promptData["35"]) {
+        document.getElementById('controlEnable').checked = true;
+        document.getElementById('controlStrength').value = promptData["35"].inputs.strength || 0.8;
+        if (promptData["41"]) {
+            document.getElementById('controlPatchModel').value = promptData["41"].inputs.name;
+        }
+        if (promptData["38"]) {
+            document.getElementById('controlPreprocessor').value = promptData["38"].inputs.preprocessor;
+            document.getElementById('controlResolution').value = promptData["38"].inputs.resolution || 512;
+        }
+        if (promptData["39"]) {
+            document.getElementById('controlImagePath').value = promptData["39"].inputs.image;
+            restoreControlImagePreview(promptData["39"].inputs.image);
+        }
     } else {
-        document.getElementById('upscaleEnable').checked = false;
-    }
-
-    if (promptData["44"]) {
-        document.getElementById('loraEnable').checked = true;
-        document.getElementById('loraModel').value = promptData["44"].inputs.lora_name;
-        document.getElementById('loraStrength').value = promptData["44"].inputs.strength_model;
-    } else {
-        document.getElementById('loraEnable').checked = false;
-    }
-
-    // Denoise参数
-    if (promptData["40"] && promptData["40"].inputs.denoise) {
-        document.getElementById('denoiseValue').value = promptData["40"].inputs.denoise;
+        document.getElementById('controlEnable').checked = false;
     }
 
     // 文件名前缀
@@ -1110,11 +1092,7 @@ async function fillFormFromPromptData(promptData) {
         document.getElementById('filePrefix').value = prefix_parts.join('/');
     }
 
-    if (promptData["42"] && promptData["42"].inputs.filename_prefix) {
-        let prefix_parts = promptData["42"].inputs.filename_prefix.split('/');
-        prefix_parts.shift();
-        document.getElementById('filePrefix').value = prefix_parts.join('/');
-    }
+
 }
 
 /**
@@ -1401,10 +1379,10 @@ function toggleParamsContainer() {
     }
 }
 
-// 控制图片放大容器的展开和收起
-function toggleUpscaleContainer() {
-    const content = document.getElementById('upscaleContent');
-    const toggleBtn = document.getElementById('upscaleToggleBtn');
+// 控制Control容器的展开和收起
+function toggleControlContainer() {
+    const content = document.getElementById('controlContent');
+    const toggleBtn = document.getElementById('controlToggleBtn');
 
     const isHidden = content.classList.contains('hidden');
     
@@ -1414,6 +1392,85 @@ function toggleUpscaleContainer() {
     } else {
         content.classList.add('hidden');
         toggleBtn.textContent = '展开';
+    }
+}
+
+// 上传 Control 参考图片
+async function handleControlImageUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        showToast('请选择图片文件');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const base64 = e.target.result;
+        
+        try {
+            showToast('正在上传图片...');
+            const res = await fetch('/api/upload-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64 })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                document.getElementById('controlImagePath').value = data.path;
+                
+                const preview = document.getElementById('controlImagePreview');
+                const placeholder = document.getElementById('controlImagePlaceholder');
+                const previewImg = document.getElementById('controlImagePreviewImg');
+                const nameEl = document.getElementById('controlImageName');
+                
+                previewImg.src = base64;
+                nameEl.textContent = file.name;
+                preview.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                
+                showToast('图片上传成功');
+            } else {
+                showToast(data.error || '上传失败');
+            }
+        } catch (err) {
+            console.error('上传图片失败:', err);
+            showToast('上传失败');
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// 恢复 Control 参考图片预览（用于导入工作流时显示已有图片）
+async function restoreControlImagePreview(imagePath) {
+    if (!imagePath) return;
+
+    try {
+        const res = await fetch(`/api/read-image?path=${encodeURIComponent(imagePath)}`);
+        if (!res.ok) return;
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+
+        const preview = document.getElementById('controlImagePreview');
+        const placeholder = document.getElementById('controlImagePlaceholder');
+        const previewImg = document.getElementById('controlImagePreviewImg');
+        const nameEl = document.getElementById('controlImageName');
+
+        previewImg.src = url;
+        nameEl.textContent = imagePath.split(/[\\/]/).pop();
+        preview.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+
+        // 释放旧的 URL
+        if (previewImg.dataset.lastUrl) {
+            URL.revokeObjectURL(previewImg.dataset.lastUrl);
+        }
+        previewImg.dataset.lastUrl = url;
+    } catch (err) {
+        console.error('恢复预览图失败:', err);
     }
 }
 
@@ -1433,22 +1490,6 @@ function toggleSaveParamsContainer() {
         content.classList.add('hidden');
         toggleBtn.textContent = '展开';
         if (arrow) arrow.style.transform = 'rotate(0deg)';
-    }
-}
-
-// 控制LoRAs容器的展开和收起
-function toggleLoraContainer() {
-    const content = document.getElementById('loraContent');
-    const toggleBtn = document.getElementById('loraToggleBtn');
-
-    const isHidden = content.classList.contains('hidden');
-    
-    if (isHidden) {
-        content.classList.remove('hidden');
-        toggleBtn.textContent = '收起';
-    } else {
-        content.classList.add('hidden');
-        toggleBtn.textContent = '展开';
     }
 }
 
