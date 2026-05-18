@@ -367,6 +367,16 @@
                     <input type="number" id="controlStrength" value="0.8" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
                 </div>
                 <div class="pt-2">
+                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">介入比例</label>
+                    <select id="controlInterventionRatio" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                        <option value="0.4">40%</option>
+                        <option value="0.5">50%</option>
+                        <option value="0.6" selected>60%</option>
+                        <option value="0.7">70%</option>
+                        <option value="0.8">80%</option>
+                    </select>
+                </div>
+                <div class="pt-2">
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-sm font-medium text-slate-600 dark:text-slate-400">参考图片</label>
                         <button id="controlCropBtn" onclick="openCropModal()" type="button" disabled class="text-xs px-2 py-1 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed">

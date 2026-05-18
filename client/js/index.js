@@ -20,7 +20,7 @@ window.addEventListener('beforeunload', stopHistoryPolling);
 async function initOriginalWorkflow() {
     try {
         // 加载工作流模板（内置 Control 节点）
-        const workflowResponse = await fetch('../config/workflow.json');
+        const workflowResponse = await fetch('../config/workflow-with-double-sample.json');
         originalWorkflow = await workflowResponse.json();
         console.log('工作流模板:', originalWorkflow);
     } catch (error) {
@@ -289,12 +289,36 @@ async function queuePrompt() {
         p["6"].inputs.text = document.getElementById('promptText').value;
         p["5"].inputs.width = w;
         p["5"].inputs.height = h;
-        p["3"].inputs.seed = seed;
-        p["3"].inputs.sampler_name = sampler;
-        p["3"].inputs.scheduler = scheduler;
-        p["3"].inputs.cfg = parseFloat(document.getElementById('cfgInput').value);
-        p["3"].inputs.steps = parseInt(document.getElementById('stepsInput').value);
-        
+
+        const steps = parseInt(document.getElementById('stepsInput').value);
+        const cfg = parseFloat(document.getElementById('cfgInput').value);
+
+        // 双采样器公共参数
+        p["57"].inputs.noise_seed = seed;
+        p["57"].inputs.steps = steps;
+        p["57"].inputs.cfg = cfg;
+        p["57"].inputs.sampler_name = sampler;
+        p["57"].inputs.scheduler = scheduler;
+
+        p["58"].inputs.noise_seed = seed;
+        p["58"].inputs.steps = steps;
+        p["58"].inputs.cfg = cfg;
+        p["58"].inputs.sampler_name = sampler;
+        p["58"].inputs.scheduler = scheduler;
+
+        // 介入比例计算
+        const interventionRatio = parseFloat(document.getElementById('controlInterventionRatio').value);
+        const endStep = Math.min(steps, Math.ceil(steps * interventionRatio));
+        p["58"].inputs.start_at_step = 0;
+        p["58"].inputs.end_at_step = endStep;
+        p["58"].inputs.add_noise = "enable";
+        p["58"].inputs.return_with_leftover_noise = "enable";
+
+        p["57"].inputs.start_at_step = endStep;
+        p["57"].inputs.end_at_step = steps;
+        p["57"].inputs.add_noise = "disable";
+        p["57"].inputs.return_with_leftover_noise = "disable";
+
         // 模型和VAE参数
         p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
         p["32"].inputs.vae_name = document.getElementById('vaeSelect').value;
@@ -307,10 +331,11 @@ async function queuePrompt() {
             p["38"].inputs.resolution = parseInt(document.getElementById('controlResolution').value);
             p["39"].inputs.image = document.getElementById('controlImagePath').value;
             p["41"].inputs.name = document.getElementById('controlPatchModel').value;
+            p["58"].inputs.model = ["35", 0];
         } else {
-            // 未启用 Control 时删除节点，恢复采样直连
-            delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"];
-            p["3"].inputs.model = ["25", 0];
+            // 未启用 Control 时删除多余节点，恢复采样直连
+            delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"]; delete p["44"];
+            p["58"].inputs.model = ["25", 0];
         }
 
         // 文件前缀处理
@@ -337,7 +362,8 @@ async function queuePrompt() {
             await trackTask(data.prompt_id);
 
             // 简单的种子递增，防止批量生成的图一模一样
-            p["3"].inputs.seed += 1;
+            p["57"].inputs.noise_seed += 1;
+            p["58"].inputs.noise_seed += 1;
         }
 
     } catch (e) {
@@ -1017,15 +1043,21 @@ async function fillFormFromPromptData(promptData) {
         }
     }
 
-    // CFG
-    if (promptData["3"] && promptData["3"].inputs.cfg) {
-        document.getElementById('cfgInput').value = promptData["3"].inputs.cfg;
+    // 双采样器参数（优先从 58 读取，兼容旧格式从 3 读取）
+    const samplerNode = promptData["58"] || promptData["3"];
+    if (samplerNode && samplerNode.inputs.cfg !== undefined) {
+        document.getElementById('cfgInput').value = samplerNode.inputs.cfg;
     }
 
-    // 步数
-    if (promptData["3"] && promptData["3"].inputs.steps) {
-        document.getElementById('stepsInput').value = promptData["3"].inputs.steps;
-        document.getElementById('stepsValue').textContent = promptData["3"].inputs.steps;
+    if (samplerNode && samplerNode.inputs.steps !== undefined) {
+        const steps = samplerNode.inputs.steps;
+        document.getElementById('stepsInput').value = steps;
+        document.getElementById('stepsValue').textContent = steps;
+    }
+
+    if (samplerNode && samplerNode.inputs.sampler_name && samplerNode.inputs.scheduler) {
+        const samplerValue = `${samplerNode.inputs.sampler_name},${samplerNode.inputs.scheduler}`;
+        document.getElementById('samplerSelect').value = samplerValue;
     }
 
     // 图片尺寸
@@ -1062,16 +1094,14 @@ async function fillFormFromPromptData(promptData) {
         updateResHint();
     }
 
-    // 采样器组合
-    if (promptData["3"] && promptData["3"].inputs.sampler_name && promptData["3"].inputs.scheduler) {
-        const samplerValue = `${promptData["3"].inputs.sampler_name},${promptData["3"].inputs.scheduler}`;
-        document.getElementById('samplerSelect').value = samplerValue;
-    }
-
-    // Control 设置
-    if (promptData["35"]) {
+    // Control 设置（双采样器格式：看 58.model 是否连 35）
+    const hasControl = promptData["58"] && promptData["58"].inputs.model &&
+        JSON.stringify(promptData["58"].inputs.model) === JSON.stringify(["35", 0]);
+    if (hasControl || promptData["35"]) {
         document.getElementById('controlEnable').checked = true;
-        document.getElementById('controlStrength').value = promptData["35"].inputs.strength || 0.8;
+        if (promptData["35"]) {
+            document.getElementById('controlStrength').value = promptData["35"].inputs.strength || 0.8;
+        }
         if (promptData["41"]) {
             document.getElementById('controlPatchModel').value = promptData["41"].inputs.name;
         }
@@ -1082,6 +1112,17 @@ async function fillFormFromPromptData(promptData) {
         if (promptData["39"]) {
             document.getElementById('controlImagePath').value = promptData["39"].inputs.image;
             restoreControlImagePreview(promptData["39"].inputs.image);
+        }
+        // 介入比例
+        if (promptData["58"] && promptData["58"].inputs.end_at_step !== undefined && samplerNode && samplerNode.inputs.steps) {
+            const steps = samplerNode.inputs.steps;
+            const endStep = promptData["58"].inputs.end_at_step;
+            const ratio = endStep / steps;
+            const ratioOptions = [0.4, 0.5, 0.6, 0.7, 0.8];
+            const closest = ratioOptions.reduce((prev, curr) =>
+                Math.abs(curr - ratio) < Math.abs(prev - ratio) ? curr : prev
+            );
+            document.getElementById('controlInterventionRatio').value = String(closest);
         }
     } else {
         document.getElementById('controlEnable').checked = false;

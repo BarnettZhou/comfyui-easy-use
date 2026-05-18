@@ -1,38 +1,8 @@
 {
-  "3": {
-    "inputs": {
-      "seed": 1072415564277516,
-      "steps": 8,
-      "cfg": 1,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "denoise": 1,
-      "model": [
-        "35",
-        0
-      ],
-      "positive": [
-        "6",
-        0
-      ],
-      "negative": [
-        "11",
-        0
-      ],
-      "latent_image": [
-        "5",
-        0
-      ]
-    },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "采样"
-    }
-  },
   "5": {
     "inputs": {
-      "width": 720,
-      "height": 1280,
+      "width": 1280,
+      "height": 720,
       "batch_size": 1
     },
     "class_type": "EmptyLatentImage",
@@ -56,7 +26,7 @@
   "8": {
     "inputs": {
       "samples": [
-        "3",
+        "57",
         0
       ],
       "vae": [
@@ -139,7 +109,7 @@
   },
   "35": {
     "inputs": {
-      "strength": 0.5,
+      "strength": 0.6,
       "model": [
         "25",
         0
@@ -159,7 +129,7 @@
     },
     "class_type": "QwenImageDiffsynthControlnet",
     "_meta": {
-      "title": "QwenImageDiffsynthControlnet"
+      "title": "QIDC"
     }
   },
   "38": {
@@ -178,7 +148,7 @@
   },
   "39": {
     "inputs": {
-      "image": "demo-controlnet.png"
+      "image": "img_crop_2026-05-18_23-14-22.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -192,6 +162,84 @@
     "class_type": "ModelPatchLoader",
     "_meta": {
       "title": "加载模型补丁"
+    }
+  },
+  "44": {
+    "inputs": {
+      "images": [
+        "38",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "预览图像"
+    }
+  },
+  "57": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 10,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 6,
+      "end_at_step": 10,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "25",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "58",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "最终采样"
+    }
+  },
+  "58": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 0,
+      "steps": 10,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 6,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "35",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "带预处理采样"
     }
   }
 }

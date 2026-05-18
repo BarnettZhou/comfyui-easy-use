@@ -37,7 +37,7 @@ async function loadModelCovers() {
 
 async function initOriginalWorkflow() {
     try {
-        const workflowResponse = await fetch('../config/workflow.json');
+        const workflowResponse = await fetch('../config/workflow-with-double-sample.json');
         originalWorkflow = await workflowResponse.json();
     } catch (error) {
         console.error('加载原始工作流失败:', error);
@@ -431,11 +431,32 @@ async function startEvaluation() {
                 p['6'].inputs.text = promptText;
                 p['5'].inputs.width = w;
                 p['5'].inputs.height = h;
-                p['3'].inputs.seed = seed;
-                p['3'].inputs.sampler_name = sampler;
-                p['3'].inputs.scheduler = scheduler;
-                p['3'].inputs.steps = steps;
-                p['3'].inputs.cfg = 1;
+
+                // 双采样器公共参数
+                p['57'].inputs.noise_seed = seed;
+                p['57'].inputs.steps = steps;
+                p['57'].inputs.cfg = 1;
+                p['57'].inputs.sampler_name = sampler;
+                p['57'].inputs.scheduler = scheduler;
+
+                p['58'].inputs.noise_seed = seed;
+                p['58'].inputs.steps = steps;
+                p['58'].inputs.cfg = 1;
+                p['58'].inputs.sampler_name = sampler;
+                p['58'].inputs.scheduler = scheduler;
+
+                // 无 Control：58 完整采样，57 透传结果
+                p['58'].inputs.start_at_step = 0;
+                p['58'].inputs.end_at_step = steps;
+                p['58'].inputs.add_noise = 'enable';
+                p['58'].inputs.return_with_leftover_noise = 'disable';
+                p['58'].inputs.model = ['25', 0];
+
+                p['57'].inputs.start_at_step = steps;
+                p['57'].inputs.end_at_step = steps;
+                p['57'].inputs.add_noise = 'disable';
+                p['57'].inputs.return_with_leftover_noise = 'disable';
+                p['57'].inputs.model = ['25', 0];
 
                 // 模型和VAE
                 p['34'].inputs.unet_name = modelValue;
@@ -446,6 +467,7 @@ async function startEvaluation() {
                 delete p['38'];
                 delete p['39'];
                 delete p['41'];
+                delete p['44'];
 
                 p['25'].inputs.shift = 3;
                 p['25'].inputs.model = ['34', 0];
