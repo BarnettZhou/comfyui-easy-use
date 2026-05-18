@@ -293,48 +293,62 @@ async function queuePrompt() {
         const steps = parseInt(document.getElementById('stepsInput').value);
         const cfg = parseFloat(document.getElementById('cfgInput').value);
 
-        // 双采样器公共参数
-        p["57"].inputs.noise_seed = seed;
-        p["57"].inputs.steps = steps;
-        p["57"].inputs.cfg = cfg;
-        p["57"].inputs.sampler_name = sampler;
-        p["57"].inputs.scheduler = scheduler;
-
-        p["58"].inputs.noise_seed = seed;
-        p["58"].inputs.steps = steps;
-        p["58"].inputs.cfg = cfg;
-        p["58"].inputs.sampler_name = sampler;
-        p["58"].inputs.scheduler = scheduler;
-
-        // 介入比例计算
-        const interventionRatio = parseFloat(document.getElementById('controlInterventionRatio').value);
-        const endStep = Math.min(steps, Math.ceil(steps * interventionRatio));
-        p["58"].inputs.start_at_step = 0;
-        p["58"].inputs.end_at_step = endStep;
-        p["58"].inputs.add_noise = "enable";
-        p["58"].inputs.return_with_leftover_noise = "enable";
-
-        p["57"].inputs.start_at_step = endStep;
-        p["57"].inputs.end_at_step = steps;
-        p["57"].inputs.add_noise = "disable";
-        p["57"].inputs.return_with_leftover_noise = "disable";
-
         // 模型和VAE参数
         p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
         p["32"].inputs.vae_name = document.getElementById('vaeSelect').value;
 
         // Control 处理
         if (document.getElementById('controlEnable').checked) {
-            // 设置 Control 参数（节点已存在于工作流模板中）
+            // ===== 双采样器模式（Control 开启）=====
             p["35"].inputs.strength = parseFloat(document.getElementById('controlStrength').value);
             p["38"].inputs.preprocessor = document.getElementById('controlPreprocessor').value;
             p["38"].inputs.resolution = parseInt(document.getElementById('controlResolution').value);
             p["39"].inputs.image = document.getElementById('controlImagePath').value;
             p["41"].inputs.name = document.getElementById('controlPatchModel').value;
+
+            // 介入比例计算
+            const interventionRatio = parseFloat(document.getElementById('controlInterventionRatio').value);
+            const endStep = Math.min(steps, Math.ceil(steps * interventionRatio));
+
+            // 1号采样器（初采样）
+            p["58"].inputs.noise_seed = seed;
+            p["58"].inputs.steps = steps;
+            p["58"].inputs.cfg = cfg;
+            p["58"].inputs.sampler_name = sampler;
+            p["58"].inputs.scheduler = scheduler;
+            p["58"].inputs.start_at_step = 0;
+            p["58"].inputs.end_at_step = endStep;
+            p["58"].inputs.add_noise = "enable";
+            p["58"].inputs.return_with_leftover_noise = "enable";
             p["58"].inputs.model = ["35", 0];
+
+            // 2号采样器（最终采样）
+            p["57"].inputs.noise_seed = seed;
+            p["57"].inputs.steps = steps;
+            p["57"].inputs.cfg = cfg;
+            p["57"].inputs.sampler_name = sampler;
+            p["57"].inputs.scheduler = scheduler;
+            p["57"].inputs.start_at_step = endStep;
+            p["57"].inputs.end_at_step = steps;
+            p["57"].inputs.add_noise = "disable";
+            p["57"].inputs.return_with_leftover_noise = "disable";
+            p["57"].inputs.model = ["25", 0];
         } else {
-            // 未启用 Control 时删除多余节点，恢复采样直连
-            delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"]; delete p["44"];
+            // ===== 单采样器模式（Control 未开启）=====
+            delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"]; delete p["44"]; delete p["57"];
+
+            // 1号采样器直连 VAE
+            p["8"].inputs.samples = ["58", 0];
+
+            p["58"].inputs.noise_seed = seed;
+            p["58"].inputs.steps = steps;
+            p["58"].inputs.cfg = cfg;
+            p["58"].inputs.sampler_name = sampler;
+            p["58"].inputs.scheduler = scheduler;
+            p["58"].inputs.start_at_step = 0;
+            p["58"].inputs.end_at_step = steps;
+            p["58"].inputs.add_noise = "enable";
+            p["58"].inputs.return_with_leftover_noise = "disable";
             p["58"].inputs.model = ["25", 0];
         }
 
@@ -1094,10 +1108,10 @@ async function fillFormFromPromptData(promptData) {
         updateResHint();
     }
 
-    // Control 设置（双采样器格式：看 58.model 是否连 35）
-    const hasControl = promptData["58"] && promptData["58"].inputs.model &&
+    // Control 设置：看 58.model 是否连 35，且存在 57 节点（双采样器模式）
+    const hasControl = promptData["57"] && promptData["58"] && promptData["58"].inputs.model &&
         JSON.stringify(promptData["58"].inputs.model) === JSON.stringify(["35", 0]);
-    if (hasControl || promptData["35"]) {
+    if (hasControl) {
         document.getElementById('controlEnable').checked = true;
         if (promptData["35"]) {
             document.getElementById('controlStrength').value = promptData["35"].inputs.strength || 0.8;

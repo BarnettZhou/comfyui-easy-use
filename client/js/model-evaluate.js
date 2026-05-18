@@ -432,42 +432,24 @@ async function startEvaluation() {
                 p['5'].inputs.width = w;
                 p['5'].inputs.height = h;
 
-                // 双采样器公共参数
-                p['57'].inputs.noise_seed = seed;
-                p['57'].inputs.steps = steps;
-                p['57'].inputs.cfg = 1;
-                p['57'].inputs.sampler_name = sampler;
-                p['57'].inputs.scheduler = scheduler;
+                // 单采样器模式：删除 57 及 Control 节点，58 直连 VAE
+                delete p['35']; delete p['38']; delete p['39']; delete p['41']; delete p['44']; delete p['57'];
+                p['8'].inputs.samples = ['58', 0];
 
                 p['58'].inputs.noise_seed = seed;
                 p['58'].inputs.steps = steps;
                 p['58'].inputs.cfg = 1;
                 p['58'].inputs.sampler_name = sampler;
                 p['58'].inputs.scheduler = scheduler;
-
-                // 无 Control：58 完整采样，57 透传结果
                 p['58'].inputs.start_at_step = 0;
                 p['58'].inputs.end_at_step = steps;
                 p['58'].inputs.add_noise = 'enable';
                 p['58'].inputs.return_with_leftover_noise = 'disable';
                 p['58'].inputs.model = ['25', 0];
 
-                p['57'].inputs.start_at_step = steps;
-                p['57'].inputs.end_at_step = steps;
-                p['57'].inputs.add_noise = 'disable';
-                p['57'].inputs.return_with_leftover_noise = 'disable';
-                p['57'].inputs.model = ['25', 0];
-
                 // 模型和VAE
                 p['34'].inputs.unet_name = modelValue;
                 p['32'].inputs.vae_name = vae;
-
-                // 删除 ControlNet 相关节点
-                delete p['35'];
-                delete p['38'];
-                delete p['39'];
-                delete p['41'];
-                delete p['44'];
 
                 p['25'].inputs.shift = 3;
                 p['25'].inputs.model = ['34', 0];
