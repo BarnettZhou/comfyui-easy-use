@@ -752,54 +752,6 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // 上传遮罩图片
-    if (req.url === '/api/upload-mask' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => body += chunk);
-        req.on('end', () => {
-            try {
-                const { image } = JSON.parse(body);
-                if (!image) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: '缺少图片数据' }), 'utf-8');
-                    return;
-                }
-
-                const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
-                if (!match) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: '无效的图片格式' }), 'utf-8');
-                    return;
-                }
-
-                const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
-                const base64Data = match[2];
-                const buffer = Buffer.from(base64Data, 'base64');
-
-                const maskDir = path.join(__dirname, '..', 'cache', 'image-mask');
-                if (!fs.existsSync(maskDir)) {
-                    fs.mkdirSync(maskDir, { recursive: true });
-                }
-
-                const now = new Date();
-                const pad = n => String(n).padStart(2, '0');
-                const datetime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-                const filename = `mask_${datetime}.${ext}`;
-                const filePath = path.join(maskDir, filename);
-
-                fs.writeFileSync(filePath, buffer);
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, path: filePath, filename }), 'utf-8');
-            } catch (error) {
-                console.error('[API] 上传遮罩失败:', error);
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: '上传遮罩失败' }), 'utf-8');
-            }
-        });
-        return;
-    }
-
     // 读取图片（用于恢复 Control 参考图预览）
     if (req.url.startsWith('/api/read-image')) {
         try {
