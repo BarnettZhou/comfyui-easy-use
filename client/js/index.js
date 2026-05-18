@@ -153,9 +153,9 @@ function setupWebSocket() {
     socket.onclose = () => setTimeout(setupWebSocket, 5000); // 掉线重连
 }
 
-function resetProgress() {
+function resetProgress(text = '0%') {
     document.getElementById('progress1').style.width = '0%';
-    document.getElementById('progressText1').innerText = '0%';
+    document.getElementById('progressText1').innerText = text;
 
     // 清空预览图
     const previewImg = document.getElementById('livePreview');
@@ -173,6 +173,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initServerConfig();
     initOriginalWorkflow();
     initConsole();
+    resetProgress('无任务');
 });
 
 // ========== 分辨率提示更新 ==========
@@ -348,7 +349,8 @@ async function queuePrompt() {
         btn.innerText = originalText;
         btn.classList.add('hover:bg-blue-700');
         
-        // 面板常显，任务结束后保持当前进度和预览
+        // 面板常显，任务结束后显示"任务已结束"
+        document.getElementById('progressText1').innerText = '任务已结束';
     }
 }
 
@@ -1420,16 +1422,17 @@ async function handleControlImageUpload(input) {
             
             if (data.success) {
                 document.getElementById('controlImagePath').value = data.path;
+                document.getElementById('controlImageOriginalPath').value = data.path;
                 
                 const preview = document.getElementById('controlImagePreview');
                 const placeholder = document.getElementById('controlImagePlaceholder');
                 const previewImg = document.getElementById('controlImagePreviewImg');
-                const nameEl = document.getElementById('controlImageName');
                 
                 previewImg.src = base64;
-                nameEl.textContent = file.name;
                 preview.classList.remove('hidden');
                 placeholder.classList.add('hidden');
+                const cropBtn = document.getElementById('controlCropBtn');
+                cropBtn.disabled = false;
                 
                 showToast('图片上传成功');
             } else {
@@ -1442,6 +1445,581 @@ async function handleControlImageUpload(input) {
     };
     reader.readAsDataURL(file);
 }
+
+// ========== Control 图片裁剪 ==========
+let cropState = {
+    active: false,
+    ratio: 1,
+    boxX: 0, boxY: 0,
+    boxW: 0, boxH: 0,
+    containerW: 0, containerH: 0,
+    dragging: false,
+    resizing: false,
+    handle: null,
+    startX: 0, startY: 0,
+    startBox: null
+};
+
+function getCropAspectRatio() {
+    const ratio = document.getElementById('ratioSelect').value;
+    if (ratio === '1:1') return 1;
+    if (ratio === '3:4') return 3 / 4;
+    if (ratio === '4:3') return 4 / 3;
+    if (ratio === 'custom') {
+        const w = parseInt(document.getElementById('widthInput').value) || 1;
+        const h = parseInt(document.getElementById('heightInput').value) || 1;
+        return w / h;
+    }
+    return 1;
+}
+
+async function openCropModal() {
+    const previewImg = document.getElementById('controlImagePreviewImg');
+    if (!previewImg.src) {
+        showToast('请先上传参考图片');
+        return;
+    }
+
+    const modal = document.getElementById('cropModal');
+    const sourceImg = document.getElementById('cropSourceImg');
+    const ratioHint = document.getElementById('cropRatioHint');
+
+    // 始终使用原图进行裁剪
+    const originalPath = document.getElementById('controlImageOriginalPath').value;
+    if (originalPath && originalPath !== document.getElementById('controlImagePath').value) {
+        sourceImg.src = '/api/read-image?path=' + encodeURIComponent(originalPath);
+    } else {
+        sourceImg.src = previewImg.src;
+    }
+
+    await new Promise((resolve, reject) => {
+        sourceImg.onload = resolve;
+        sourceImg.onerror = () => { showToast('图片加载失败'); reject(); };
+    });
+
+    const ratio = getCropAspectRatio();
+    const ratioText = document.getElementById('ratioSelect').value;
+    ratioHint.textContent = '裁剪比例: ' + ratioText;
+
+    modal.classList.remove('hidden');
+    cropState.active = true;
+
+    // 等两帧确保浏览器布局完全稳定后再初始化
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            initCropBox(ratio);
+        });
+    });
+}
+
+function closeCropModal() {
+    document.getElementById('cropModal').classList.add('hidden');
+    cropState.active = false;
+    cropState.dragging = false;
+    cropState.resizing = false;
+
+    // 清除显式尺寸，避免影响下次打开
+    const img = document.getElementById('cropSourceImg');
+    const container = document.getElementById('cropContainer');
+    img.style.width = '';
+    img.style.height = '';
+    container.style.width = '';
+    container.style.height = '';
+}
+
+function initCropBox(ratio) {
+    const container = document.getElementById('cropContainer');
+    const img = document.getElementById('cropSourceImg');
+
+    // 读取图片在 CSS 约束后的实际渲染尺寸
+    const displayW = img.offsetWidth;
+    const displayH = img.offsetHeight;
+
+    // 显式固定尺寸，确保后续事件处理基于确定值
+    img.style.width = displayW + 'px';
+    img.style.height = displayH + 'px';
+    container.style.width = displayW + 'px';
+    container.style.height = displayH + 'px';
+
+    // 初始化裁剪框（居中，占 80%）
+    const maxBoxW = displayW * 0.8;
+    const maxBoxH = displayH * 0.8;
+
+    let boxW, boxH;
+    if (maxBoxW / ratio <= maxBoxH) {
+        boxW = maxBoxW;
+        boxH = maxBoxW / ratio;
+    } else {
+        boxH = maxBoxH;
+        boxW = maxBoxH * ratio;
+    }
+
+    cropState.ratio = ratio;
+    cropState.boxX = (displayW - boxW) / 2;
+    cropState.boxY = (displayH - boxH) / 2;
+    cropState.boxW = boxW;
+    cropState.boxH = boxH;
+    cropState.containerW = displayW;
+    cropState.containerH = displayH;
+
+    updateCropBoxStyle();
+}
+
+function updateCropBoxStyle() {
+    const box = document.getElementById('cropBox');
+    box.style.left = cropState.boxX + 'px';
+    box.style.top = cropState.boxY + 'px';
+    box.style.width = cropState.boxW + 'px';
+    box.style.height = cropState.boxH + 'px';
+}
+
+function applyResize(handle, dx, dy) {
+    const sb = cropState.startBox;
+    let x = sb.boxX, y = sb.boxY, w = sb.boxW, h = sb.boxH;
+    const ratio = cropState.ratio;
+    const maxW = cropState.containerW;
+    const maxH = cropState.containerH;
+
+    const useDy = Math.abs(dy) > Math.abs(dx);
+    let delta;
+
+    if (useDy) {
+        delta = dy;
+        // 上侧手柄：向上拖动应增加高度
+        if (handle === 'nw' || handle === 'ne') delta = -delta;
+    } else {
+        delta = dx;
+        // 左侧手柄：向左拖动应增加宽度
+        if (handle === 'nw' || handle === 'sw') delta = -delta;
+    }
+
+    if (useDy) {
+        h = Math.max(64, h + delta);
+        w = h * ratio;
+    } else {
+        w = Math.max(64, w + delta);
+        h = w / ratio;
+    }
+
+    if (handle.includes('w')) x = sb.boxX + sb.boxW - w;
+    if (handle.includes('n')) y = sb.boxY + sb.boxH - h;
+
+    // 边界限制：确保不超出容器
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > maxW) w = maxW - x;
+    if (y + h > maxH) h = maxH - y;
+
+    w = Math.max(64, w);
+    h = Math.max(64, h);
+
+    // 保持比例并再次检查边界
+    if (useDy) {
+        w = h * ratio;
+        if (x + w > maxW) {
+            w = maxW - x;
+            h = w / ratio;
+        }
+    } else {
+        h = w / ratio;
+        if (y + h > maxH) {
+            h = maxH - y;
+            w = h * ratio;
+        }
+    }
+
+    if (handle.includes('w')) x = Math.max(0, sb.boxX + sb.boxW - w);
+    if (handle.includes('n')) y = Math.max(0, sb.boxY + sb.boxH - h);
+
+    cropState.boxX = x;
+    cropState.boxY = y;
+    cropState.boxW = w;
+    cropState.boxH = h;
+}
+
+async function confirmCrop() {
+    const sourceImg = document.getElementById('cropSourceImg');
+    const naturalW = sourceImg.naturalWidth;
+    const naturalH = sourceImg.naturalHeight;
+    const displayW = sourceImg.offsetWidth;
+    const displayH = sourceImg.offsetHeight;
+
+    const sx = Math.round((cropState.boxX / displayW) * naturalW);
+    const sy = Math.round((cropState.boxY / displayH) * naturalH);
+    const sw = Math.round((cropState.boxW / displayW) * naturalW);
+    const sh = Math.round((cropState.boxH / displayH) * naturalH);
+
+    const maxCanvasSize = 2048;
+    let canvasW = sw;
+    let canvasH = sh;
+    if (canvasW > maxCanvasSize || canvasH > maxCanvasSize) {
+        const scale = maxCanvasSize / Math.max(canvasW, canvasH);
+        canvasW = Math.round(canvasW * scale);
+        canvasH = Math.round(canvasH * scale);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(sourceImg, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
+
+    const base64 = canvas.toDataURL('image/png');
+
+    try {
+        showToast('正在保存裁剪图片...');
+        const res = await fetch('/api/upload-image-crop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('controlImagePath').value = data.path;
+
+            const previewImg = document.getElementById('controlImagePreviewImg');
+
+            previewImg.src = base64;
+            const cropBtn = document.getElementById('controlCropBtn');
+            cropBtn.disabled = false;
+
+            closeCropModal();
+            showToast('裁剪图片已保存');
+        } else {
+            showToast(data.error || '保存失败');
+        }
+    } catch (err) {
+        console.error('裁剪图片保存失败:', err);
+        showToast('保存失败');
+    }
+}
+
+// 绑定裁剪事件
+(function setupCropEvents() {
+    const container = document.getElementById('cropContainer');
+    if (!container) return;
+
+    function onStart(e) {
+        if (!cropState.active) return;
+        e.preventDefault();
+
+        const target = e.target;
+        const handle = target.closest('.crop-handle');
+        const box = document.getElementById('cropBox');
+
+        if (handle) {
+            cropState.resizing = true;
+            cropState.handle = handle.dataset.handle;
+        } else if (target === box || box.contains(target)) {
+            cropState.dragging = true;
+        }
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        cropState.startX = clientX;
+        cropState.startY = clientY;
+        cropState.startBox = { boxX: cropState.boxX, boxY: cropState.boxY, boxW: cropState.boxW, boxH: cropState.boxH };
+    }
+
+    function onMove(e) {
+        if (!cropState.active) return;
+        if (!cropState.dragging && !cropState.resizing) return;
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const dx = clientX - cropState.startX;
+        const dy = clientY - cropState.startY;
+
+        if (cropState.dragging) {
+            let newX = cropState.startBox.boxX + dx;
+            let newY = cropState.startBox.boxY + dy;
+            newX = Math.max(0, Math.min(newX, cropState.containerW - cropState.boxW));
+            newY = Math.max(0, Math.min(newY, cropState.containerH - cropState.boxH));
+            cropState.boxX = newX;
+            cropState.boxY = newY;
+            updateCropBoxStyle();
+        } else if (cropState.resizing) {
+            applyResize(cropState.handle, dx, dy);
+            updateCropBoxStyle();
+        }
+    }
+
+    function onEnd() {
+        cropState.dragging = false;
+        cropState.resizing = false;
+        cropState.handle = null;
+    }
+
+    container.addEventListener('mousedown', onStart);
+    container.addEventListener('touchstart', onStart, { passive: false });
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove, { passive: false });
+
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchend', onEnd);
+})();
+
+// ========== Control 遮罩绘制 ==========
+let maskCtx = null;
+let maskDrawing = false;
+let maskLastPos = null;
+
+async function initMaskCanvas() {
+    const canvas = document.getElementById('maskCanvas');
+    const refImg = document.getElementById('maskRefImg');
+    const box = document.getElementById('maskCanvasBox');
+    const wrapper = document.getElementById('maskCanvasWrapper');
+    const ratio = getCropAspectRatio();
+
+    // 画布实际像素尺寸（保存用）：最小边 768px
+    let pixelW, pixelH;
+    if (ratio >= 1) {
+        pixelH = 768;
+        pixelW = Math.round(768 * ratio);
+    } else {
+        pixelW = 768;
+        pixelH = Math.round(768 / ratio);
+    }
+
+    // 获取 wrapper 可用空间（保底防止布局未就绪）
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const availW = Math.max(300, (wrapperRect.width || 800) - 48);
+    const availH = Math.max(300, (wrapperRect.height || 600) - 48);
+
+    // 等比例缩放到可用空间
+    let displayW = pixelW;
+    let displayH = pixelH;
+    const scale = Math.min(1, availW / pixelW, availH / pixelH);
+    if (scale < 1) {
+        displayW = Math.round(pixelW * scale);
+        displayH = Math.round(pixelH * scale);
+    }
+
+    // 记录设计尺寸，供坐标转换使用
+    canvas.dataset.designWidth = pixelW;
+    canvas.dataset.designHeight = pixelH;
+
+    // 设置容器固定尺寸（内部 absolute 元素以此为基准）
+    box.style.width = displayW + 'px';
+    box.style.height = displayH + 'px';
+
+    // 加载参考图（先恢复显示状态）
+    refImg.style.display = 'block';
+    const previewImg = document.getElementById('controlImagePreviewImg');
+    if (previewImg.src) {
+        refImg.src = previewImg.src;
+        try {
+            await new Promise((resolve, reject) => {
+                refImg.onload = resolve;
+                refImg.onerror = (e) => {
+                    console.warn('遮罩参考图加载失败:', previewImg.src.substring(0, 60));
+                    reject(e);
+                };
+            });
+        } catch (err) {
+            refImg.style.display = 'none';
+        }
+    }
+
+    // 设置 canvas 实际像素（考虑 DPR）和 CSS 显示尺寸
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = pixelW * dpr;
+    canvas.height = pixelH * dpr;
+    canvas.style.width = displayW + 'px';
+    canvas.style.height = displayH + 'px';
+
+    maskCtx = canvas.getContext('2d');
+    maskCtx.scale(dpr, dpr);
+    maskCtx.lineCap = 'round';
+    maskCtx.lineJoin = 'round';
+    maskCtx.clearRect(0, 0, pixelW, pixelH); // 透明背景，由下方黑色半透明层提供视觉效果
+
+    updateMaskBrushSize();
+
+    // 显示画布尺寸
+    const ratioText = document.getElementById('ratioSelect').value;
+    document.getElementById('maskRatioHint').textContent = pixelW + '×' + pixelH + 'px · ' + ratioText;
+}
+
+function updateMaskBrushSize() {
+    if (!maskCtx) return;
+    const size = parseInt(document.getElementById('maskBrushSize').value);
+    document.getElementById('maskBrushSizeValue').textContent = size;
+    maskCtx.lineWidth = size;
+    maskCtx.strokeStyle = '#ffffff';
+    updateMaskFeather();
+}
+
+function updateMaskFeather() {
+    if (!maskCtx) return;
+    const feather = parseInt(document.getElementById('maskFeather').value);
+    document.getElementById('maskFeatherValue').textContent = feather;
+    maskCtx.shadowBlur = feather;
+    maskCtx.shadowColor = '#ffffff';
+    maskCtx.shadowOffsetX = 0;
+    maskCtx.shadowOffsetY = 0;
+}
+
+function getMaskCanvasPos(e) {
+    const canvas = document.getElementById('maskCanvas');
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    // 将鼠标 CSS 坐标转换为 canvas 内部设计坐标（canvas 显示尺寸可能和实际像素不同）
+    const displayW = rect.width;
+    const displayH = rect.height;
+    const designW = parseFloat(canvas.dataset.designWidth) || displayW;
+    const designH = parseFloat(canvas.dataset.designHeight) || displayH;
+    return {
+        x: (clientX - rect.left) * (designW / displayW),
+        y: (clientY - rect.top) * (designH / displayH)
+    };
+}
+
+function maskDrawStart(e) {
+    if (e.target !== document.getElementById('maskCanvas')) return;
+    e.preventDefault();
+    maskDrawing = true;
+    maskLastPos = getMaskCanvasPos(e);
+}
+
+function maskDrawMove(e) {
+    if (!maskDrawing || !maskCtx) return;
+    e.preventDefault();
+    const pos = getMaskCanvasPos(e);
+    maskCtx.beginPath();
+    maskCtx.moveTo(maskLastPos.x, maskLastPos.y);
+    maskCtx.lineTo(pos.x, pos.y);
+    maskCtx.stroke();
+    maskLastPos = pos;
+}
+
+function maskDrawEnd() {
+    maskDrawing = false;
+    maskLastPos = null;
+}
+
+function clearMaskCanvas() {
+    if (!maskCtx) return;
+    const canvas = document.getElementById('maskCanvas');
+    const w = parseFloat(canvas.style.width) || canvas.width;
+    const h = parseFloat(canvas.style.height) || canvas.height;
+    maskCtx.clearRect(0, 0, w, h);
+}
+
+function openMaskModal() {
+    const previewImg = document.getElementById('controlImagePreviewImg');
+    if (!previewImg.src) {
+        showToast('请先上传参考图片');
+        return;
+    }
+
+    const modal = document.getElementById('maskModal');
+    modal.classList.remove('hidden');
+
+    // 等布局稳定后初始化画布
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            initMaskCanvas();
+        });
+    });
+}
+
+function closeMaskModal() {
+    document.getElementById('maskModal').classList.add('hidden');
+    maskDrawing = false;
+    maskLastPos = null;
+
+    // 清理参考图和容器尺寸
+    const refImg = document.getElementById('maskRefImg');
+    const box = document.getElementById('maskCanvasBox');
+    refImg.src = '';
+    refImg.style.display = '';
+    box.style.width = '';
+    box.style.height = '';
+}
+
+async function confirmMask() {
+    const canvas = document.getElementById('maskCanvas');
+    if (!canvas) return;
+
+    // 创建临时 canvas：黑色背景（100%）+ 叠加绘制内容
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.fillStyle = '#000000';
+    tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+    tempCtx.drawImage(canvas, 0, 0);
+
+    const base64 = tempCanvas.toDataURL('image/png');
+
+    try {
+        showToast('正在保存遮罩...');
+        const res = await fetch('/api/upload-mask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('controlMaskPath').value = data.path;
+
+            const preview = document.getElementById('controlMaskPreview');
+            const placeholder = document.getElementById('controlMaskPlaceholder');
+            const previewImg = document.getElementById('controlMaskPreviewImg');
+
+            previewImg.src = base64;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            document.getElementById('controlClearMaskBtn').classList.remove('hidden');
+
+            closeMaskModal();
+            showToast('遮罩已保存');
+        } else {
+            showToast(data.error || '保存失败');
+        }
+    } catch (err) {
+        console.error('遮罩保存失败:', err);
+        showToast('保存失败');
+    }
+}
+
+function clearMask() {
+    document.getElementById('controlMaskPath').value = '';
+    const preview = document.getElementById('controlMaskPreview');
+    const placeholder = document.getElementById('controlMaskPlaceholder');
+    const previewImg = document.getElementById('controlMaskPreviewImg');
+
+    previewImg.src = '';
+    preview.classList.add('hidden');
+    placeholder.classList.remove('hidden');
+    document.getElementById('controlClearMaskBtn').classList.add('hidden');
+}
+
+// 绑定遮罩绘制事件
+(function setupMaskEvents() {
+    const canvas = document.getElementById('maskCanvas');
+    const brushSize = document.getElementById('maskBrushSize');
+    if (!canvas || !brushSize) return;
+
+    canvas.addEventListener('mousedown', maskDrawStart);
+    canvas.addEventListener('mousemove', maskDrawMove);
+    canvas.addEventListener('mouseup', maskDrawEnd);
+    canvas.addEventListener('mouseleave', maskDrawEnd);
+
+    canvas.addEventListener('touchstart', maskDrawStart, { passive: false });
+    canvas.addEventListener('touchmove', maskDrawMove, { passive: false });
+    canvas.addEventListener('touchend', maskDrawEnd);
+
+    brushSize.addEventListener('input', updateMaskBrushSize);
+
+    const featherInput = document.getElementById('maskFeather');
+    if (featherInput) featherInput.addEventListener('input', updateMaskFeather);
+})();
 
 // 恢复 Control 参考图片预览（用于导入工作流时显示已有图片）
 async function restoreControlImagePreview(imagePath) {
@@ -1457,12 +2035,12 @@ async function restoreControlImagePreview(imagePath) {
         const preview = document.getElementById('controlImagePreview');
         const placeholder = document.getElementById('controlImagePlaceholder');
         const previewImg = document.getElementById('controlImagePreviewImg');
-        const nameEl = document.getElementById('controlImageName');
 
         previewImg.src = url;
-        nameEl.textContent = imagePath.split(/[\\/]/).pop();
         preview.classList.remove('hidden');
         placeholder.classList.add('hidden');
+        const cropBtn = document.getElementById('controlCropBtn');
+        cropBtn.disabled = false;
 
         // 释放旧的 URL
         if (previewImg.dataset.lastUrl) {

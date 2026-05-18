@@ -678,8 +678,8 @@ const server = http.createServer((req, res) => {
                 const base64Data = match[2];
                 const buffer = Buffer.from(base64Data, 'base64');
 
-                // 确保 cache 目录存在
-                const cacheDir = path.join(__dirname, '..', 'cache');
+                // 确保 cache/images 目录存在
+                const cacheDir = path.join(__dirname, '..', 'cache', 'images');
                 if (!fs.existsSync(cacheDir)) {
                     fs.mkdirSync(cacheDir, { recursive: true });
                 }
@@ -699,6 +699,102 @@ const server = http.createServer((req, res) => {
                 console.error('[API] 上传图片失败:', error);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: '上传图片失败' }), 'utf-8');
+            }
+        });
+        return;
+    }
+
+    // 上传裁剪后的图片
+    if (req.url === '/api/upload-image-crop' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { image } = JSON.parse(body);
+                if (!image) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '缺少图片数据' }), 'utf-8');
+                    return;
+                }
+
+                const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
+                if (!match) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '无效的图片格式' }), 'utf-8');
+                    return;
+                }
+
+                const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+                const base64Data = match[2];
+                const buffer = Buffer.from(base64Data, 'base64');
+
+                const cropDir = path.join(__dirname, '..', 'cache', 'image-crop');
+                if (!fs.existsSync(cropDir)) {
+                    fs.mkdirSync(cropDir, { recursive: true });
+                }
+
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                const datetime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                const filename = `img_crop_${datetime}.${ext}`;
+                const filePath = path.join(cropDir, filename);
+
+                fs.writeFileSync(filePath, buffer);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, path: filePath, filename }), 'utf-8');
+            } catch (error) {
+                console.error('[API] 上传裁剪图片失败:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '上传裁剪图片失败' }), 'utf-8');
+            }
+        });
+        return;
+    }
+
+    // 上传遮罩图片
+    if (req.url === '/api/upload-mask' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { image } = JSON.parse(body);
+                if (!image) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '缺少图片数据' }), 'utf-8');
+                    return;
+                }
+
+                const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
+                if (!match) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '无效的图片格式' }), 'utf-8');
+                    return;
+                }
+
+                const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+                const base64Data = match[2];
+                const buffer = Buffer.from(base64Data, 'base64');
+
+                const maskDir = path.join(__dirname, '..', 'cache', 'image-mask');
+                if (!fs.existsSync(maskDir)) {
+                    fs.mkdirSync(maskDir, { recursive: true });
+                }
+
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                const datetime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                const filename = `mask_${datetime}.${ext}`;
+                const filePath = path.join(maskDir, filename);
+
+                fs.writeFileSync(filePath, buffer);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, path: filePath, filename }), 'utf-8');
+            } catch (error) {
+                console.error('[API] 上传遮罩失败:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '上传遮罩失败' }), 'utf-8');
             }
         });
         return;
