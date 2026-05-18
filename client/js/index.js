@@ -376,7 +376,7 @@ async function queuePrompt() {
             await trackTask(data.prompt_id);
 
             // 简单的种子递增，防止批量生成的图一模一样
-            p["57"].inputs.noise_seed += 1;
+            if (p["57"]) p["57"].inputs.noise_seed += 1;
             p["58"].inputs.noise_seed += 1;
         }
 
