@@ -299,7 +299,7 @@ async function queuePrompt() {
 
         // Control 处理
         if (document.getElementById('controlEnable').checked) {
-            // ===== 双采样器模式（Control 开启）=====
+            // ===== Control 开启 =====
             p["35"].inputs.strength = parseFloat(document.getElementById('controlStrength').value);
             p["38"].inputs.preprocessor = document.getElementById('controlPreprocessor').value;
             p["38"].inputs.resolution = parseInt(document.getElementById('controlResolution').value);
@@ -319,20 +319,28 @@ async function queuePrompt() {
             p["58"].inputs.start_at_step = 0;
             p["58"].inputs.end_at_step = endStep;
             p["58"].inputs.add_noise = "enable";
-            p["58"].inputs.return_with_leftover_noise = "enable";
             p["58"].inputs.model = ["35", 0];
 
-            // 2号采样器（最终采样）
-            p["57"].inputs.noise_seed = seed;
-            p["57"].inputs.steps = steps;
-            p["57"].inputs.cfg = cfg;
-            p["57"].inputs.sampler_name = sampler;
-            p["57"].inputs.scheduler = scheduler;
-            p["57"].inputs.start_at_step = endStep;
-            p["57"].inputs.end_at_step = steps;
-            p["57"].inputs.add_noise = "disable";
-            p["57"].inputs.return_with_leftover_noise = "disable";
-            p["57"].inputs.model = ["25", 0];
+            if (interventionRatio >= 1.0) {
+                // 100% 介入：不需要二次采样器，58 直连 VAE
+                delete p["57"];
+                p["8"].inputs.samples = ["58", 0];
+                p["58"].inputs.return_with_leftover_noise = "disable";
+            } else {
+                // 双采样器模式
+                p["58"].inputs.return_with_leftover_noise = "enable";
+
+                p["57"].inputs.noise_seed = seed;
+                p["57"].inputs.steps = steps;
+                p["57"].inputs.cfg = cfg;
+                p["57"].inputs.sampler_name = sampler;
+                p["57"].inputs.scheduler = scheduler;
+                p["57"].inputs.start_at_step = endStep;
+                p["57"].inputs.end_at_step = steps;
+                p["57"].inputs.add_noise = "disable";
+                p["57"].inputs.return_with_leftover_noise = "disable";
+                p["57"].inputs.model = ["25", 0];
+            }
         } else {
             // ===== 单采样器模式（Control 未开启）=====
             delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"]; delete p["44"]; delete p["57"];
@@ -1108,8 +1116,8 @@ async function fillFormFromPromptData(promptData) {
         updateResHint();
     }
 
-    // Control 设置：看 58.model 是否连 35，且存在 57 节点（双采样器模式）
-    const hasControl = promptData["57"] && promptData["58"] && promptData["58"].inputs.model &&
+    // Control 设置：看 58.model 是否连 35
+    const hasControl = promptData["58"] && promptData["58"].inputs.model &&
         JSON.stringify(promptData["58"].inputs.model) === JSON.stringify(["35", 0]);
     if (hasControl) {
         document.getElementById('controlEnable').checked = true;
@@ -1132,7 +1140,7 @@ async function fillFormFromPromptData(promptData) {
             const steps = samplerNode.inputs.steps;
             const endStep = promptData["58"].inputs.end_at_step;
             const ratio = endStep / steps;
-            const ratioOptions = [0.4, 0.5, 0.6, 0.7, 0.8];
+            const ratioOptions = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
             const closest = ratioOptions.reduce((prev, curr) =>
                 Math.abs(curr - ratio) < Math.abs(prev - ratio) ? curr : prev
             );
