@@ -1116,9 +1116,8 @@ async function fillFormFromPromptData(promptData) {
         updateResHint();
     }
 
-    // Control 设置：看 58.model 是否连 35
-    const hasControl = promptData["58"] && promptData["58"].inputs.model &&
-        JSON.stringify(promptData["58"].inputs.model) === JSON.stringify(["35", 0]);
+    // Control 设置：看是否存在 35 号节点（QIDC）
+    const hasControl = !!promptData["35"];
     if (hasControl) {
         document.getElementById('controlEnable').checked = true;
         if (promptData["35"]) {
