@@ -157,7 +157,7 @@
   },
   "14": {
     "inputs": {
-      "strength": 0.5,
+      "strength": 0.8,
       "model": [
         "5",
         0
@@ -222,7 +222,7 @@
       ],
       "return_with_leftover_noise": "enable",
       "model": [
-        "24",
+        "14",
         0
       ],
       "positive": [
@@ -245,7 +245,7 @@
   },
   "18": {
     "inputs": {
-      "value": -686526367095728
+      "value": 874646479235593
     },
     "class_type": "PrimitiveInt",
     "_meta": {
@@ -305,57 +305,6 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "生成图像"
-    }
-  },
-  "24": {
-    "inputs": {
-      "strength": 0.5,
-      "model": [
-        "14",
-        0
-      ],
-      "model_patch": [
-        "15",
-        0
-      ],
-      "vae": [
-        "3",
-        0
-      ],
-      "image": [
-        "25",
-        0
-      ]
-    },
-    "class_type": "QwenImageDiffsynthControlnet",
-    "_meta": {
-      "title": "QIDC"
-    }
-  },
-  "25": {
-    "inputs": {
-      "preprocessor": "DepthAnythingPreprocessor",
-      "resolution": 512,
-      "image": [
-        "20",
-        0
-      ]
-    },
-    "class_type": "AIO_Preprocessor",
-    "_meta": {
-      "title": "AIO Aux Preprocessor"
-    }
-  },
-  "26": {
-    "inputs": {
-      "images": [
-        "25",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "预览图像"
     }
   }
 }

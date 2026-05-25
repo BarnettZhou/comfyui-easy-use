@@ -65,24 +65,6 @@
       "title": "空Latent图像"
     }
   },
-  "9": {
-    "inputs": {
-      "value": 10
-    },
-    "class_type": "PrimitiveInt",
-    "_meta": {
-      "title": "步数"
-    }
-  },
-  "10": {
-    "inputs": {
-      "value": 0.3
-    },
-    "class_type": "PrimitiveFloat",
-    "_meta": {
-      "title": "介入时机"
-    }
-  },
   "11": {
     "inputs": {
       "add_noise": "disable",
@@ -90,22 +72,13 @@
         "18",
         0
       ],
-      "steps": [
-        "9",
-        0
-      ],
+      "steps": 10,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "start_at_step": [
-        "19",
-        0
-      ],
-      "end_at_step": [
-        "9",
-        0
-      ],
-      "return_with_leftover_noise": "disable",
+      "start_at_step": 3,
+      "end_at_step": 5,
+      "return_with_leftover_noise": "enable",
       "model": [
         "5",
         0
@@ -125,7 +98,7 @@
     },
     "class_type": "KSamplerAdvanced",
     "_meta": {
-      "title": "最终采样"
+      "title": "Control-2采样"
     }
   },
   "12": {
@@ -157,7 +130,7 @@
   },
   "14": {
     "inputs": {
-      "strength": 0.5,
+      "strength": 0.7,
       "model": [
         "5",
         0
@@ -198,7 +171,7 @@
     },
     "class_type": "PreviewImage",
     "_meta": {
-      "title": "预览图像"
+      "title": "预览图像-LineArt"
     }
   },
   "17": {
@@ -208,18 +181,12 @@
         "18",
         0
       ],
-      "steps": [
-        "9",
-        0
-      ],
+      "steps": 10,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
       "start_at_step": 0,
-      "end_at_step": [
-        "19",
-        0
-      ],
+      "end_at_step": 3,
       "return_with_leftover_noise": "enable",
       "model": [
         "24",
@@ -240,33 +207,16 @@
     },
     "class_type": "KSamplerAdvanced",
     "_meta": {
-      "title": "带预处理采样"
+      "title": "Control-1采样"
     }
   },
   "18": {
     "inputs": {
-      "value": -686526367095728
+      "value": 460088654453138
     },
     "class_type": "PrimitiveInt",
     "_meta": {
       "title": "种子"
-    }
-  },
-  "19": {
-    "inputs": {
-      "value": "a*b",
-      "a": [
-        "9",
-        0
-      ],
-      "b": [
-        "10",
-        0
-      ]
-    },
-    "class_type": "SimpleMath+",
-    "_meta": {
-      "title": "介入计算"
     }
   },
   "20": {
@@ -281,7 +231,7 @@
   "21": {
     "inputs": {
       "samples": [
-        "11",
+        "28",
         0
       ],
       "vae": [
@@ -309,9 +259,9 @@
   },
   "24": {
     "inputs": {
-      "strength": 0.5,
+      "strength": 0.7,
       "model": [
-        "14",
+        "5",
         0
       ],
       "model_patch": [
@@ -334,7 +284,7 @@
   },
   "25": {
     "inputs": {
-      "preprocessor": "DepthAnythingPreprocessor",
+      "preprocessor": "DepthAnythingV2Preprocessor",
       "resolution": 512,
       "image": [
         "20",
@@ -355,7 +305,43 @@
     },
     "class_type": "PreviewImage",
     "_meta": {
-      "title": "预览图像"
+      "title": "预览图像-Depth"
+    }
+  },
+  "28": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": [
+        "18",
+        0
+      ],
+      "steps": 10,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 5,
+      "end_at_step": 10,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "5",
+        0
+      ],
+      "positive": [
+        "12",
+        0
+      ],
+      "negative": [
+        "2",
+        0
+      ],
+      "latent_image": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "最终采样"
     }
   }
 }

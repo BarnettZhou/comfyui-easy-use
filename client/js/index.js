@@ -12,20 +12,64 @@ let currentImageExtraInfo = { folder: '-', time: '-' }; // 当前图片的额外
 let historyPollingTimer = null; // 历史记录轮询定时器
 let displayedTaskIds = new Set(); // 跟踪已显示的任务ID，用于优化历史记录加载
 let socket; // WebSocket 实例，用于监听进度更新
+let workflows = {};
+let currentWorkflowKey = 'default';
 
 // 页面卸载时停止轮询
 window.addEventListener('beforeunload', stopHistoryPolling);
 
-// 初始化原始工作流
-async function initOriginalWorkflow() {
-    try {
-        // 加载工作流模板（内置 Control 节点）
-        const workflowResponse = await fetch('../config/workflow-with-double-sample.json');
-        originalWorkflow = await workflowResponse.json();
-        console.log('工作流模板:', originalWorkflow);
-    } catch (error) {
-        console.error('加载原始工作流失败:', error);
-        showToast('加载原始工作流失败，请检查服务器是否正常运行');
+// 初始化所有工作流模板
+async function initWorkflows() {
+    const workflowFiles = {
+        default: '../workflows/zit-no-control.json',
+        single: '../workflows/zit-single-control.json',
+        double: '../workflows/zit-double-control.json',
+        series: '../workflows/zit-double-control-series.json'
+    };
+    for (const [key, path] of Object.entries(workflowFiles)) {
+        try {
+            const res = await fetch(path);
+            workflows[key] = await res.json();
+            console.log(`工作流模板[${key}]:`, workflows[key]);
+        } catch (error) {
+            console.error(`加载工作流失败 ${path}:`, error);
+            showToast(`加载工作流失败: ${key}`);
+        }
+    }
+}
+
+function initControlTabs() {
+    document.querySelectorAll('.control-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchControlTab(btn.dataset.tab);
+        });
+    });
+}
+
+function switchControlTab(tab) {
+    currentWorkflowKey = tab;
+    document.querySelectorAll('.control-tab-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === tab;
+        if (isActive) {
+            btn.classList.add('bg-white', 'dark:bg-slate-600', 'text-slate-700', 'dark:text-slate-200', 'shadow-sm');
+            btn.classList.remove('text-slate-500', 'dark:text-slate-400');
+        } else {
+            btn.classList.remove('bg-white', 'dark:bg-slate-600', 'text-slate-700', 'dark:text-slate-200', 'shadow-sm');
+            btn.classList.add('text-slate-500', 'dark:text-slate-400');
+        }
+    });
+    document.querySelectorAll('.control-tab-content').forEach(el => el.classList.add('hidden'));
+    const content = document.getElementById('control-tab-' + tab);
+    if (content) content.classList.remove('hidden');
+
+    // 共享参考图片：默认隐藏，其余显示
+    const sharedImage = document.getElementById('controlSharedImage');
+    if (sharedImage) {
+        if (tab === 'default') {
+            sharedImage.classList.add('hidden');
+        } else {
+            sharedImage.classList.remove('hidden');
+        }
     }
 }
 
@@ -62,29 +106,35 @@ async function initConsole() {
             vaeSelect.appendChild(option);
         });
 
-        // 初始化补丁模型下拉选项
-        const patchSelect = document.getElementById('controlPatchModel');
-        patchSelect.innerHTML = '';
-        config.modal_patchs.forEach(patch => {
-            const option = document.createElement('option');
-            if (typeof patch === 'string') {
-                option.value = patch;
-                option.textContent = patch;
-            } else {
-                option.value = patch.value;
-                option.textContent = patch.text;
-            }
-            patchSelect.appendChild(option);
+        // 初始化所有补丁模型下拉框
+        ['scPatchModel', 'dcPatchModel', 'dsPatchModel'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            sel.innerHTML = '';
+            config.modal_patchs.forEach(patch => {
+                const option = document.createElement('option');
+                if (typeof patch === 'string') {
+                    option.value = patch;
+                    option.textContent = patch;
+                } else {
+                    option.value = patch.value;
+                    option.textContent = patch.text;
+                }
+                sel.appendChild(option);
+            });
         });
 
-        // 初始化预处理类型下拉选项
-        const preprocessorSelect = document.getElementById('controlPreprocessor');
-        preprocessorSelect.innerHTML = '';
-        config.preprocessors.forEach(pp => {
-            const option = document.createElement('option');
-            option.value = pp;
-            option.textContent = pp;
-            preprocessorSelect.appendChild(option);
+        // 初始化所有预处理类型下拉框
+        ['scPreprocessor', 'dcPreprocessor1', 'dcPreprocessor2', 'dsPreprocessor1', 'dsPreprocessor2'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            sel.innerHTML = '';
+            config.preprocessors.forEach(pp => {
+                const option = document.createElement('option');
+                option.value = pp;
+                option.textContent = pp;
+                sel.appendChild(option);
+            });
         });
 
         // 初始化采样器组合下拉选项
@@ -105,6 +155,10 @@ async function initConsole() {
 
         // 初始化尺寸选项
         updateSizeOptions();
+
+        // 初始化 Control 标签页
+        initControlTabs();
+        switchControlTab('default');
 
         console.log('配置加载成功');
     } catch (error) {
@@ -171,7 +225,7 @@ function resetProgress(text = '0%') {
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', async function() {
     await initServerConfig();
-    initOriginalWorkflow();
+    initWorkflows();
     initConsole();
     resetProgress('无任务');
 });
@@ -258,7 +312,7 @@ async function queuePrompt() {
     btn.classList.remove('hover:bg-blue-700'); 
 
     try {
-        const p = JSON.parse(JSON.stringify(originalWorkflow));
+        const p = JSON.parse(JSON.stringify(workflows[currentWorkflowKey]));
         const ratio = document.getElementById('ratioSelect').value;
         let w, h;
         
@@ -285,80 +339,20 @@ async function queuePrompt() {
         const seed = Math.floor(Math.random() * 1000000000000);
         const batchCount = parseInt(document.getElementById('batchCount').value);
 
-        // 基础参数
-        p["6"].inputs.text = document.getElementById('promptText').value;
-        p["5"].inputs.width = w;
-        p["5"].inputs.height = h;
+        // 基础参数（所有工作流通用节点）
+        p["12"].inputs.text = document.getElementById('promptText').value;
+        p["6"].inputs.width = w;
+        p["6"].inputs.height = h;
+        p["6"].inputs.batch_size = batchCount;
 
         const steps = parseInt(document.getElementById('stepsInput').value);
         const cfg = parseFloat(document.getElementById('cfgInput').value);
+        const shift = parseFloat(document.getElementById('shiftInput')?.value || 3);
 
         // 模型和VAE参数
-        p["34"].inputs.unet_name = document.getElementById('modelSelect').value;
-        p["32"].inputs.vae_name = document.getElementById('vaeSelect').value;
-
-        // Control 处理
-        if (document.getElementById('controlEnable').checked) {
-            // ===== Control 开启 =====
-            p["35"].inputs.strength = parseFloat(document.getElementById('controlStrength').value);
-            p["38"].inputs.preprocessor = document.getElementById('controlPreprocessor').value;
-            p["38"].inputs.resolution = parseInt(document.getElementById('controlResolution').value);
-            p["39"].inputs.image = document.getElementById('controlImagePath').value;
-            p["41"].inputs.name = document.getElementById('controlPatchModel').value;
-
-            // 介入比例计算
-            const interventionRatio = parseFloat(document.getElementById('controlInterventionRatio').value);
-            const endStep = Math.min(steps, Math.ceil(steps * interventionRatio));
-
-            // 1号采样器（初采样）
-            p["58"].inputs.noise_seed = seed;
-            p["58"].inputs.steps = steps;
-            p["58"].inputs.cfg = cfg;
-            p["58"].inputs.sampler_name = sampler;
-            p["58"].inputs.scheduler = scheduler;
-            p["58"].inputs.start_at_step = 0;
-            p["58"].inputs.end_at_step = endStep;
-            p["58"].inputs.add_noise = "enable";
-            p["58"].inputs.model = ["35", 0];
-
-            if (interventionRatio >= 1.0) {
-                // 100% 介入：不需要二次采样器，58 直连 VAE
-                delete p["57"];
-                p["8"].inputs.samples = ["58", 0];
-                p["58"].inputs.return_with_leftover_noise = "disable";
-            } else {
-                // 双采样器模式
-                p["58"].inputs.return_with_leftover_noise = "enable";
-
-                p["57"].inputs.noise_seed = seed;
-                p["57"].inputs.steps = steps;
-                p["57"].inputs.cfg = cfg;
-                p["57"].inputs.sampler_name = sampler;
-                p["57"].inputs.scheduler = scheduler;
-                p["57"].inputs.start_at_step = endStep;
-                p["57"].inputs.end_at_step = steps;
-                p["57"].inputs.add_noise = "disable";
-                p["57"].inputs.return_with_leftover_noise = "disable";
-                p["57"].inputs.model = ["25", 0];
-            }
-        } else {
-            // ===== 单采样器模式（Control 未开启）=====
-            delete p["35"]; delete p["38"]; delete p["39"]; delete p["41"]; delete p["44"]; delete p["57"];
-
-            // 1号采样器直连 VAE
-            p["8"].inputs.samples = ["58", 0];
-
-            p["58"].inputs.noise_seed = seed;
-            p["58"].inputs.steps = steps;
-            p["58"].inputs.cfg = cfg;
-            p["58"].inputs.sampler_name = sampler;
-            p["58"].inputs.scheduler = scheduler;
-            p["58"].inputs.start_at_step = 0;
-            p["58"].inputs.end_at_step = steps;
-            p["58"].inputs.add_noise = "enable";
-            p["58"].inputs.return_with_leftover_noise = "disable";
-            p["58"].inputs.model = ["25", 0];
-        }
+        p["4"].inputs.unet_name = document.getElementById('modelSelect').value;
+        p["3"].inputs.vae_name = document.getElementById('vaeSelect').value;
+        p["5"].inputs.shift = shift;
 
         // 文件前缀处理
         prefix = document.getElementById('filePrefix').value || prefix;
@@ -369,7 +363,190 @@ async function queuePrompt() {
             prefix = prefix.replace(/%date%/g, date_str);
         }
         const filename_prefix = config.output_dir + "/" + prefix;
-        p["9"].inputs.filename_prefix = filename_prefix;
+        p["22"].inputs.filename_prefix = filename_prefix;
+
+        // 根据当前标签页分别处理
+        if (currentWorkflowKey === 'default') {
+            // ===== 默认工作流（无 Control）=====
+            p["17"].inputs.noise_seed = seed;
+            p["17"].inputs.steps = steps;
+            p["17"].inputs.cfg = cfg;
+            p["17"].inputs.sampler_name = sampler;
+            p["17"].inputs.scheduler = scheduler;
+            p["17"].inputs.start_at_step = 0;
+            p["17"].inputs.end_at_step = steps;
+            p["17"].inputs.add_noise = "enable";
+            p["17"].inputs.return_with_leftover_noise = "disable";
+            p["17"].inputs.model = ["5", 0];
+            p["17"].inputs.positive = ["12", 0];
+            p["17"].inputs.negative = ["2", 0];
+            p["17"].inputs.latent_image = ["6", 0];
+        } else if (currentWorkflowKey === 'single') {
+            // ===== 单控制工作流 =====
+            p["15"].inputs.name = document.getElementById('scPatchModel').value;
+            p["13"].inputs.preprocessor = document.getElementById('scPreprocessor').value;
+            p["13"].inputs.resolution = parseInt(document.getElementById('scResolution').value);
+            p["20"].inputs.image = document.getElementById('controlImagePath').value;
+            p["14"].inputs.strength = parseFloat(document.getElementById('scStrength').value);
+
+            const interventionRatio = parseFloat(document.getElementById('scInterventionRatio').value);
+            const endStep = Math.min(steps, Math.ceil(steps * interventionRatio));
+
+            p["17"].inputs.noise_seed = seed;
+            p["17"].inputs.steps = steps;
+            p["17"].inputs.cfg = cfg;
+            p["17"].inputs.sampler_name = sampler;
+            p["17"].inputs.scheduler = scheduler;
+            p["17"].inputs.start_at_step = 0;
+            p["17"].inputs.end_at_step = endStep;
+            p["17"].inputs.add_noise = "enable";
+            p["17"].inputs.model = ["14", 0];
+            p["17"].inputs.positive = ["12", 0];
+            p["17"].inputs.negative = ["2", 0];
+            p["17"].inputs.latent_image = ["6", 0];
+
+            if (interventionRatio >= 1.0) {
+                delete p["11"];
+                p["21"].inputs.samples = ["17", 0];
+                p["17"].inputs.return_with_leftover_noise = "disable";
+            } else {
+                p["17"].inputs.return_with_leftover_noise = "enable";
+                p["11"].inputs.noise_seed = seed;
+                p["11"].inputs.steps = steps;
+                p["11"].inputs.cfg = cfg;
+                p["11"].inputs.sampler_name = sampler;
+                p["11"].inputs.scheduler = scheduler;
+                p["11"].inputs.start_at_step = endStep;
+                p["11"].inputs.end_at_step = steps;
+                p["11"].inputs.add_noise = "disable";
+                p["11"].inputs.return_with_leftover_noise = "disable";
+                p["11"].inputs.model = ["5", 0];
+                p["11"].inputs.positive = ["12", 0];
+                p["11"].inputs.negative = ["2", 0];
+                p["11"].inputs.latent_image = ["17", 0];
+            }
+        } else if (currentWorkflowKey === 'double') {
+            // ===== 双控制工作流 =====
+            p["15"].inputs.name = document.getElementById('dcPatchModel').value;
+            p["20"].inputs.image = document.getElementById('controlImagePath').value;
+
+            p["13"].inputs.preprocessor = document.getElementById('dcPreprocessor1').value;
+            p["13"].inputs.resolution = parseInt(document.getElementById('dcResolution1').value);
+            p["14"].inputs.strength = parseFloat(document.getElementById('dcStrength1').value);
+
+            p["25"].inputs.preprocessor = document.getElementById('dcPreprocessor2').value;
+            p["25"].inputs.resolution = parseInt(document.getElementById('dcResolution2').value);
+            p["24"].inputs.strength = parseFloat(document.getElementById('dcStrength2').value);
+
+            const interventionRatio = parseFloat(document.getElementById('dcInterventionRatio').value);
+            const endStep = Math.min(steps, Math.ceil(steps * interventionRatio));
+
+            p["17"].inputs.noise_seed = seed;
+            p["17"].inputs.steps = steps;
+            p["17"].inputs.cfg = cfg;
+            p["17"].inputs.sampler_name = sampler;
+            p["17"].inputs.scheduler = scheduler;
+            p["17"].inputs.start_at_step = 0;
+            p["17"].inputs.end_at_step = endStep;
+            p["17"].inputs.add_noise = "enable";
+            p["17"].inputs.model = ["24", 0];
+            p["17"].inputs.positive = ["12", 0];
+            p["17"].inputs.negative = ["2", 0];
+            p["17"].inputs.latent_image = ["6", 0];
+
+            if (interventionRatio >= 1.0) {
+                delete p["11"];
+                p["21"].inputs.samples = ["17", 0];
+                p["17"].inputs.return_with_leftover_noise = "disable";
+            } else {
+                p["17"].inputs.return_with_leftover_noise = "enable";
+                p["11"].inputs.noise_seed = seed;
+                p["11"].inputs.steps = steps;
+                p["11"].inputs.cfg = cfg;
+                p["11"].inputs.sampler_name = sampler;
+                p["11"].inputs.scheduler = scheduler;
+                p["11"].inputs.start_at_step = endStep;
+                p["11"].inputs.end_at_step = steps;
+                p["11"].inputs.add_noise = "disable";
+                p["11"].inputs.return_with_leftover_noise = "disable";
+                p["11"].inputs.model = ["5", 0];
+                p["11"].inputs.positive = ["12", 0];
+                p["11"].inputs.negative = ["2", 0];
+                p["11"].inputs.latent_image = ["17", 0];
+            }
+        } else if (currentWorkflowKey === 'series') {
+            // ===== 双控制串联工作流 =====
+            p["15"].inputs.name = document.getElementById('dsPatchModel').value;
+            p["20"].inputs.image = document.getElementById('controlImagePath').value;
+
+            p["13"].inputs.preprocessor = document.getElementById('dsPreprocessor1').value;
+            p["13"].inputs.resolution = parseInt(document.getElementById('dsResolution1').value);
+            p["14"].inputs.strength = parseFloat(document.getElementById('dsStrength1').value);
+
+            p["25"].inputs.preprocessor = document.getElementById('dsPreprocessor2').value;
+            p["25"].inputs.resolution = parseInt(document.getElementById('dsResolution2').value);
+            p["24"].inputs.strength = parseFloat(document.getElementById('dsStrength2').value);
+
+            const endStep1 = parseInt(document.getElementById('dsEndStep1').value);
+            const endStep2 = parseInt(document.getElementById('dsEndStep2').value);
+
+            if (isNaN(endStep1) || endStep1 < 1 || endStep1 > steps - 2) {
+                showToast(`Control 1 结束步数必须在 1 到 ${Math.max(1, steps - 2)} 之间`);
+                isGenerating = false;
+                btn.disabled = false;
+                btn.classList.add('hover:bg-blue-700');
+                return;
+            }
+            if (isNaN(endStep2) || endStep2 <= endStep1 || endStep2 > steps - 1) {
+                showToast(`Control 2 结束步数必须在 ${endStep1 + 1} 到 ${steps - 1} 之间`);
+                isGenerating = false;
+                btn.disabled = false;
+                btn.classList.add('hover:bg-blue-700');
+                return;
+            }
+
+            p["17"].inputs.noise_seed = seed;
+            p["17"].inputs.steps = steps;
+            p["17"].inputs.cfg = cfg;
+            p["17"].inputs.sampler_name = sampler;
+            p["17"].inputs.scheduler = scheduler;
+            p["17"].inputs.start_at_step = 0;
+            p["17"].inputs.end_at_step = endStep1;
+            p["17"].inputs.add_noise = "enable";
+            p["17"].inputs.return_with_leftover_noise = "enable";
+            p["17"].inputs.model = ["24", 0];
+            p["17"].inputs.positive = ["12", 0];
+            p["17"].inputs.negative = ["2", 0];
+            p["17"].inputs.latent_image = ["6", 0];
+
+            p["11"].inputs.noise_seed = seed;
+            p["11"].inputs.steps = steps;
+            p["11"].inputs.cfg = cfg;
+            p["11"].inputs.sampler_name = sampler;
+            p["11"].inputs.scheduler = scheduler;
+            p["11"].inputs.start_at_step = endStep1;
+            p["11"].inputs.end_at_step = endStep2;
+            p["11"].inputs.add_noise = "disable";
+            p["11"].inputs.return_with_leftover_noise = "enable";
+            p["11"].inputs.model = ["5", 0];
+            p["11"].inputs.positive = ["12", 0];
+            p["11"].inputs.negative = ["2", 0];
+            p["11"].inputs.latent_image = ["17", 0];
+
+            p["28"].inputs.noise_seed = seed;
+            p["28"].inputs.steps = steps;
+            p["28"].inputs.cfg = cfg;
+            p["28"].inputs.sampler_name = sampler;
+            p["28"].inputs.scheduler = scheduler;
+            p["28"].inputs.start_at_step = endStep2;
+            p["28"].inputs.end_at_step = steps;
+            p["28"].inputs.add_noise = "disable";
+            p["28"].inputs.return_with_leftover_noise = "disable";
+            p["28"].inputs.model = ["5", 0];
+            p["28"].inputs.positive = ["12", 0];
+            p["28"].inputs.negative = ["2", 0];
+            p["28"].inputs.latent_image = ["11", 0];
+        }
 
         for(let i = 0; i < batchCount; i++) {
             if (shouldStop) break; 
@@ -384,8 +561,9 @@ async function queuePrompt() {
             await trackTask(data.prompt_id);
 
             // 简单的种子递增，防止批量生成的图一模一样
-            if (p["57"]) p["57"].inputs.noise_seed += 1;
-            p["58"].inputs.noise_seed += 1;
+            if (p["11"]) p["11"].inputs.noise_seed += 1;
+            if (p["28"]) p["28"].inputs.noise_seed += 1;
+            p["17"].inputs.noise_seed += 1;
         }
 
     } catch (e) {
@@ -1045,28 +1223,38 @@ async function setAsModelCover() {
  */
 async function fillFormFromPromptData(promptData) {
     // 提示词
-    if (promptData["6"] && promptData["6"].inputs.text) {
-        document.getElementById('promptText').value = promptData["6"].inputs.text;
+    if (promptData["12"] && promptData["12"].inputs.text) {
+        document.getElementById('promptText').value = promptData["12"].inputs.text;
     }
 
     // 模型和VAE
-    if (promptData["34"] && promptData["34"].inputs.unet_name) {
-        const unetName = promptData["34"].inputs.unet_name;
+    const modelNode = promptData["4"] || promptData["34"];
+    if (modelNode && modelNode.inputs.unet_name) {
+        const unetName = modelNode.inputs.unet_name;
         const modelOption = config.diffusion_models.find(opt => opt.value === unetName);
         if (modelOption) {
             document.getElementById('modelSelect').value = modelOption.value;
         }
     }
 
-    if (promptData["32"] && promptData["32"].inputs.vae_name) {
-        const vaeOption = config.vae_models.find(opt => opt.value === promptData["32"].inputs.vae_name);
+    const vaeNode = promptData["3"] || promptData["32"];
+    if (vaeNode && vaeNode.inputs.vae_name) {
+        const vaeOption = config.vae_models.find(opt => opt.value === vaeNode.inputs.vae_name);
         if (vaeOption) {
             document.getElementById('vaeSelect').value = vaeOption.value;
         }
     }
 
-    // 双采样器参数（优先从 58 读取，兼容旧格式从 3 读取）
-    const samplerNode = promptData["58"] || promptData["3"];
+    // 采样器参数：查找任意 KSamplerAdvanced 节点
+    let samplerNode = null;
+    const samplerIds = ["17", "11", "28", "58", "57", "3"];
+    for (const sid of samplerIds) {
+        if (promptData[sid] && promptData[sid].inputs && promptData[sid].inputs.sampler_name) {
+            samplerNode = promptData[sid];
+            break;
+        }
+    }
+
     if (samplerNode && samplerNode.inputs.cfg !== undefined) {
         document.getElementById('cfgInput').value = samplerNode.inputs.cfg;
     }
@@ -1083,9 +1271,9 @@ async function fillFormFromPromptData(promptData) {
     }
 
     // 图片尺寸
-    if (promptData["5"] && promptData["5"].inputs.width && promptData["5"].inputs.height) {
-        const imgWidth = promptData["5"].inputs.width;
-        const imgHeight = promptData["5"].inputs.height;
+    if (promptData["6"] && promptData["6"].inputs.width && promptData["6"].inputs.height) {
+        const imgWidth = promptData["6"].inputs.width;
+        const imgHeight = promptData["6"].inputs.height;
         const sizeValue = `${imgWidth},${imgHeight}`;
         
         let foundRatio = null;
@@ -1116,47 +1304,115 @@ async function fillFormFromPromptData(promptData) {
         updateResHint();
     }
 
-    // Control 设置：看是否存在 35 号节点（QIDC）
-    const hasControl = !!promptData["35"];
-    if (hasControl) {
-        document.getElementById('controlEnable').checked = true;
-        if (promptData["35"]) {
-            document.getElementById('controlStrength').value = promptData["35"].inputs.strength || 0.8;
+    // 判断工作流类型并切换标签页
+    const has14 = !!promptData["14"];
+    const has24 = !!promptData["24"];
+    const has28 = !!promptData["28"];
+
+    if (has14 && has24 && has28) {
+        switchControlTab('series');
+        if (promptData["15"]) {
+            document.getElementById('dsPatchModel').value = promptData["15"].inputs.name;
         }
-        if (promptData["41"]) {
-            document.getElementById('controlPatchModel').value = promptData["41"].inputs.name;
+        if (promptData["20"]) {
+            document.getElementById('controlImagePath').value = promptData["20"].inputs.image;
+            restoreControlImagePreview(promptData["20"].inputs.image);
         }
-        if (promptData["38"]) {
-            document.getElementById('controlPreprocessor').value = promptData["38"].inputs.preprocessor;
-            document.getElementById('controlResolution').value = promptData["38"].inputs.resolution || 512;
+        if (promptData["13"]) {
+            document.getElementById('dsPreprocessor1').value = promptData["13"].inputs.preprocessor;
+            document.getElementById('dsResolution1').value = promptData["13"].inputs.resolution || 512;
         }
-        if (promptData["39"]) {
-            document.getElementById('controlImagePath').value = promptData["39"].inputs.image;
-            restoreControlImagePreview(promptData["39"].inputs.image);
+        if (promptData["14"]) {
+            document.getElementById('dsStrength1').value = promptData["14"].inputs.strength || 0.7;
+        }
+        if (promptData["25"]) {
+            document.getElementById('dsPreprocessor2').value = promptData["25"].inputs.preprocessor;
+            document.getElementById('dsResolution2').value = promptData["25"].inputs.resolution || 512;
+        }
+        if (promptData["24"]) {
+            document.getElementById('dsStrength2').value = promptData["24"].inputs.strength || 0.7;
+        }
+        // 串联结束步数
+        if (promptData["17"] && promptData["17"].inputs.end_at_step !== undefined) {
+            document.getElementById('dsEndStep1').value = promptData["17"].inputs.end_at_step;
+        }
+        if (promptData["11"] && promptData["11"].inputs.end_at_step !== undefined) {
+            document.getElementById('dsEndStep2').value = promptData["11"].inputs.end_at_step;
+        }
+    } else if (has14 && has24) {
+        switchControlTab('double');
+        if (promptData["15"]) {
+            document.getElementById('dcPatchModel').value = promptData["15"].inputs.name;
+        }
+        if (promptData["20"]) {
+            document.getElementById('controlImagePath').value = promptData["20"].inputs.image;
+            restoreControlImagePreview(promptData["20"].inputs.image);
+        }
+        if (promptData["13"]) {
+            document.getElementById('dcPreprocessor1').value = promptData["13"].inputs.preprocessor;
+            document.getElementById('dcResolution1').value = promptData["13"].inputs.resolution || 512;
+        }
+        if (promptData["14"]) {
+            document.getElementById('dcStrength1').value = promptData["14"].inputs.strength || 0.5;
+        }
+        if (promptData["25"]) {
+            document.getElementById('dcPreprocessor2').value = promptData["25"].inputs.preprocessor;
+            document.getElementById('dcResolution2').value = promptData["25"].inputs.resolution || 512;
+        }
+        if (promptData["24"]) {
+            document.getElementById('dcStrength2').value = promptData["24"].inputs.strength || 0.5;
         }
         // 介入比例
-        if (promptData["58"] && promptData["58"].inputs.end_at_step !== undefined && samplerNode && samplerNode.inputs.steps) {
+        const sampler17 = promptData["17"];
+        if (sampler17 && sampler17.inputs.end_at_step !== undefined && samplerNode && samplerNode.inputs.steps) {
             const steps = samplerNode.inputs.steps;
-            const endStep = promptData["58"].inputs.end_at_step;
+            const endStep = sampler17.inputs.end_at_step;
             const ratio = endStep / steps;
             const ratioOptions = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
             const closest = ratioOptions.reduce((prev, curr) =>
                 Math.abs(curr - ratio) < Math.abs(prev - ratio) ? curr : prev
             );
-            document.getElementById('controlInterventionRatio').value = String(closest);
+            document.getElementById('dcInterventionRatio').value = String(closest);
+        }
+    } else if (has14) {
+        switchControlTab('single');
+        if (promptData["15"]) {
+            document.getElementById('scPatchModel').value = promptData["15"].inputs.name;
+        }
+        if (promptData["20"]) {
+            document.getElementById('controlImagePath').value = promptData["20"].inputs.image;
+            restoreControlImagePreview(promptData["20"].inputs.image);
+        }
+        if (promptData["13"]) {
+            document.getElementById('scPreprocessor').value = promptData["13"].inputs.preprocessor;
+            document.getElementById('scResolution').value = promptData["13"].inputs.resolution || 512;
+        }
+        if (promptData["14"]) {
+            document.getElementById('scStrength').value = promptData["14"].inputs.strength || 0.8;
+        }
+        // 介入比例
+        const sampler17 = promptData["17"];
+        if (sampler17 && sampler17.inputs.end_at_step !== undefined && samplerNode && samplerNode.inputs.steps) {
+            const steps = samplerNode.inputs.steps;
+            const endStep = sampler17.inputs.end_at_step;
+            const ratio = endStep / steps;
+            const ratioOptions = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+            const closest = ratioOptions.reduce((prev, curr) =>
+                Math.abs(curr - ratio) < Math.abs(prev - ratio) ? curr : prev
+            );
+            document.getElementById('scInterventionRatio').value = String(closest);
         }
     } else {
-        document.getElementById('controlEnable').checked = false;
+        switchControlTab('default');
     }
 
     // 文件名前缀
-    if (promptData["9"] && promptData["9"].inputs.filename_prefix) {
-        let prefix_parts = promptData["9"].inputs.filename_prefix.split('/');
+    const saveNode = promptData["22"] || promptData["9"];
+    if (saveNode && saveNode.inputs.filename_prefix) {
+        let prefix_parts = saveNode.inputs.filename_prefix.split('/');
         prefix_parts.shift();
         document.getElementById('filePrefix').value = prefix_parts.join('/');
     }
-
-
 }
 
 /**
@@ -1741,7 +1997,6 @@ async function confirmCrop() {
             document.getElementById('controlImagePath').value = data.path;
 
             const previewImg = document.getElementById('controlImagePreviewImg');
-
             previewImg.src = base64;
             const cropBtn = document.getElementById('controlCropBtn');
             cropBtn.disabled = false;

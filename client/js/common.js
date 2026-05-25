@@ -45,14 +45,29 @@ function extractPromptDataFromPromptText(prompt_text) {
 
     let width = prompt['5']?.inputs?.width || '-';
     let height = prompt['5']?.inputs?.height || '-';
-    let model = prompt['34']?.inputs?.unet_name || '-';
-    let samplerName = prompt['3']?.inputs?.sampler_name || '-';
-    let scheduler = prompt['3']?.inputs?.scheduler || '-';
-    let steps = prompt['3']?.inputs?.steps || '-';
-    let cfgScale = prompt['3']?.inputs?.cfg || '-';
-    let seed = prompt['3']?.inputs?.seed || '-';
-    let vaeName = prompt['32']?.inputs?.vae_name || '-';
+    let model = prompt['4']?.inputs?.unet_name || prompt['34']?.inputs?.unet_name || '-';
+    let vaeName = prompt['3']?.inputs?.vae_name || prompt['32']?.inputs?.vae_name || '-';
     let promptText = prompt['6']?.inputs?.text || '';
+
+    // 查找任意采样器节点获取 sampler/steps/cfg/seed
+    let samplerName = '-';
+    let scheduler = '-';
+    let steps = '-';
+    let cfgScale = '-';
+    let seed = '-';
+    const samplerNodeIds = ['17', '11', '28', '58', '57', '3'];
+    for (const sid of samplerNodeIds) {
+        const node = prompt[sid];
+        if (node && node.inputs) {
+            if (samplerName === '-' && node.inputs.sampler_name) samplerName = node.inputs.sampler_name;
+            if (scheduler === '-' && node.inputs.scheduler) scheduler = node.inputs.scheduler;
+            if (steps === '-' && node.inputs.steps !== undefined) steps = node.inputs.steps;
+            if (cfgScale === '-' && node.inputs.cfg !== undefined) cfgScale = node.inputs.cfg;
+            if (seed === '-' && (node.inputs.seed !== undefined || node.inputs.noise_seed !== undefined)) {
+                seed = node.inputs.seed !== undefined ? node.inputs.seed : node.inputs.noise_seed;
+            }
+        }
+    }
 
     // 如果 width/height 为空，尝试从原始文本中正则提取
     if (width === '-' || height === '-') {

@@ -332,53 +332,20 @@
                     <span class="font-semibold text-slate-700 dark:text-slate-300">Control</span>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <label class="relative inline-flex items-center cursor-pointer" onclick="event.stopPropagation()">
-                        <input type="checkbox" id="controlEnable" class="sr-only peer">
-                        <div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
-                    </label>
                     <button onclick="toggleControlContainer()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" id="controlToggleBtn">展开</button>
                 </div>
             </div>
-            <div id="controlContent" class="hidden px-5 sm:px-6 pb-5 sm:pb-6 grid sm:grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-700/50">
-                <div class="pt-4">
-                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">补丁模型</label>
-                    <div class="relative">
-                        <select id="controlPatchModel" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
-                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
+            <div id="controlContent" class="hidden px-5 sm:px-6 pb-5 sm:pb-6 border-t border-slate-100 dark:border-slate-700/50">
+                <!-- Tabs -->
+                <div class="flex space-x-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 mt-4 w-full" id="controlTabs">
+                    <button type="button" data-tab="default" class="control-tab-btn flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-colors bg-white dark:bg-slate-600 text-slate-700 dark:text-slate-200 shadow-sm">默认</button>
+                    <button type="button" data-tab="single" class="control-tab-btn flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">单控制</button>
+                    <button type="button" data-tab="double" class="control-tab-btn flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">双控制</button>
+                    <button type="button" data-tab="series" class="control-tab-btn flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">双控制串联</button>
                 </div>
-                <div class="pt-4">
-                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">预处理类型</label>
-                    <div class="relative">
-                        <select id="controlPreprocessor" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
-                        <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="pt-2">
-                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">分辨率</label>
-                    <input type="number" id="controlResolution" value="512" min="64" max="2048" step="64" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
-                </div>
-                <div class="pt-2">
-                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">强度</label>
-                    <input type="number" id="controlStrength" value="0.8" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
-                </div>
-                <div class="pt-2">
-                    <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">介入比例</label>
-                    <select id="controlInterventionRatio" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
-                        <option value="0.4">40%</option>
-                        <option value="0.5">50%</option>
-                        <option value="0.6" selected>60%</option>
-                        <option value="0.7">70%</option>
-                        <option value="0.8">80%</option>
-                        <option value="0.9">90%</option>
-                        <option value="1.0">100%</option>
-                    </select>
-                </div>
-                <div class="pt-2">
+
+                <!-- 共享参考图片 -->
+                <div id="controlSharedImage" class="hidden pt-4">
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-sm font-medium text-slate-600 dark:text-slate-400">参考图片</label>
                         <button id="controlCropBtn" onclick="openCropModal()" type="button" disabled class="text-xs px-2 py-1 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -403,8 +370,190 @@
                     <input type="hidden" id="controlImagePath">
                     <input type="hidden" id="controlImageOriginalPath">
                 </div>
-                <div class="pt-2">
 
+                <!-- 默认 -->
+                <div id="control-tab-default" class="control-tab-content hidden pt-4 text-sm text-slate-500 dark:text-slate-400 text-center">
+                    默认工作流无controlnet节点
+                </div>
+
+                <!-- 单控制 -->
+                <div id="control-tab-single" class="control-tab-content hidden">
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">补丁模型</label>
+                            <div class="relative">
+                                <select id="scPatchModel" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">介入比例</label>
+                            <select id="scInterventionRatio" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                                <option value="0.4">40%</option>
+                                <option value="0.5">50%</option>
+                                <option value="0.6" selected>60%</option>
+                                <option value="0.7">70%</option>
+                                <option value="0.8">80%</option>
+                                <option value="0.9">90%</option>
+                                <option value="1.0">100%</option>
+                            </select>
+                        </div>
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">预处理类型</label>
+                            <div class="relative">
+                                <select id="scPreprocessor" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">分辨率</label>
+                            <input type="number" id="scResolution" value="512" min="64" max="2048" step="64" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                        </div>
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">强度</label>
+                            <input type="number" id="scStrength" value="0.8" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 双控制 -->
+                <div id="control-tab-double" class="control-tab-content hidden">
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">补丁模型</label>
+                            <div class="relative">
+                                <select id="dcPatchModel" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="pt-2">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">介入比例</label>
+                            <select id="dcInterventionRatio" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                                <option value="0.4">40%</option>
+                                <option value="0.5">50%</option>
+                                <option value="0.6" selected>60%</option>
+                                <option value="0.7">70%</option>
+                                <option value="0.8">80%</option>
+                                <option value="0.9">90%</option>
+                                <option value="1.0">100%</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-4 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 class="text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">Control 1</h4>
+                        <div class="grid sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">预处理类型</label>
+                                <div class="relative">
+                                    <select id="dcPreprocessor1" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                    <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">分辨率</label>
+                                <input type="number" id="dcResolution1" value="512" min="64" max="2048" step="64" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">强度</label>
+                                <input type="number" id="dcStrength1" value="0.5" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-4 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 class="text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">Control 2</h4>
+                        <div class="grid sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">预处理类型</label>
+                                <div class="relative">
+                                    <select id="dcPreprocessor2" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                    <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">分辨率</label>
+                                <input type="number" id="dcResolution2" value="512" min="64" max="2048" step="64" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">强度</label>
+                                <input type="number" id="dcStrength2" value="0.5" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 双控制串联 -->
+                <div id="control-tab-series" class="control-tab-content hidden">
+                    <div class="pt-2">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">补丁模型</label>
+                        <div class="relative">
+                            <select id="dsPatchModel" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                            <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-4 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 class="text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">Control 1</h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">预处理类型</label>
+                                <div class="relative">
+                                    <select id="dsPreprocessor1" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                    <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">分辨率</label>
+                                <input type="number" id="dsResolution1" value="512" min="64" max="2048" step="64" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">强度</label>
+                                <input type="number" id="dsStrength1" value="0.7" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">结束步数</label>
+                                <input type="number" id="dsEndStep1" value="3" min="1" step="1" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 p-4 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 class="text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">Control 2</h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">预处理类型</label>
+                                <div class="relative">
+                                    <select id="dsPreprocessor2" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 pr-10 outline-none input-focus appearance-none text-sm transition-colors duration-300"></select>
+                                    <svg class="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">分辨率</label>
+                                <input type="number" id="dsResolution2" value="512" min="64" max="2048" step="64" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">强度</label>
+                                <input type="number" id="dsStrength2" value="0.7" min="0" max="2" step="0.05" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">结束步数</label>
+                                <input type="number" id="dsEndStep2" value="5" min="1" step="1" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl py-3 px-4 outline-none input-focus text-sm transition-colors duration-300">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
