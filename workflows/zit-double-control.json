@@ -130,7 +130,7 @@
   },
   "12": {
     "inputs": {
-      "text": "一个中国年轻女性，站在明亮的都市户外，穿浅蓝色一字露肩连衣裙，笑得很明媚。大光圈摄影，背景较为模糊。",
+      "text": "",
       "clip": [
         "1",
         0
@@ -271,7 +271,7 @@
   },
   "20": {
     "inputs": {
-      "image": "img_crop_2026-05-18_21-47-34.png"
+      "image": ""
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -296,7 +296,7 @@
   },
   "22": {
     "inputs": {
-      "filename_prefix": "test/zit",
+      "filename_prefix": "",
       "images": [
         "21",
         0

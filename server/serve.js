@@ -38,8 +38,15 @@ function getLocalIP() {
 // 解析命令行参数
 function parseArgs() {
     const args = process.argv.slice(2);
-    let port = 11451;
+    // 优先使用环境变量 PORT
+    let port = parseInt(process.env.PORT, 10);
+    if (!isNaN(port) && port > 0 && port <= 65535) {
+        return port;
+    }
+
+    port = 11451;
     for (let i = 0; i < args.length; i++) {
+        // 支持 --port 8080
         if (args[i] === '--port' && args[i + 1]) {
             const p = parseInt(args[i + 1], 10);
             if (!isNaN(p) && p > 0 && p <= 65535) {
@@ -48,6 +55,22 @@ function parseArgs() {
                 console.warn(`[警告] 无效的端口值: ${args[i + 1]}，使用默认端口 11451`);
             }
             i++;
+        }
+        // 支持 --port=8080
+        else if (args[i].startsWith('--port=')) {
+            const p = parseInt(args[i].slice(7), 10);
+            if (!isNaN(p) && p > 0 && p <= 65535) {
+                port = p;
+            } else {
+                console.warn(`[警告] 无效的端口值: ${args[i]}，使用默认端口 11451`);
+            }
+        }
+        // 支持纯数字参数（npm run serve --port 8080 时 npm 会把 --port 吃掉，只传 8080）
+        else if (/^\d+$/.test(args[i])) {
+            const p = parseInt(args[i], 10);
+            if (!isNaN(p) && p > 0 && p <= 65535) {
+                port = p;
+            }
         }
     }
     return port;
@@ -932,6 +955,21 @@ const server = http.createServer((req, res) => {
 
 // 初始化数据库
 db.init();
+
+// 监听启动错误（端口冲突、权限不足等）
+server.on('error', (err) => {
+    if (err.code === 'EACCES' || err.code === 'EADDRINUSE') {
+        console.error(`\n[错误] 端口 ${PORT} 无法使用 (${err.code === 'EACCES' ? '权限不足' : '已被占用'})`);
+        console.error('请尝试以下方式指定其他端口：');
+        console.error(`  1. npm run serve -- --port 8080`);
+        console.error(`  2. PORT=8080 npm run serve`);
+        console.error(`  3. node server/serve.js --port 8080\n`);
+        process.exit(1);
+    } else {
+        console.error('[错误] 服务器启动失败:', err.message);
+        process.exit(1);
+    }
+});
 
 // 启动服务器
 server.listen(PORT, HOST, () => {

@@ -1703,23 +1703,30 @@ function toggleParamsContainer() {
 function toggleControlContainer() {
     const content = document.getElementById('controlContent');
     const toggleBtn = document.getElementById('controlToggleBtn');
+    const arrow = document.getElementById('controlArrow');
 
     const isHidden = content.classList.contains('hidden');
     
     if (isHidden) {
         content.classList.remove('hidden');
         toggleBtn.textContent = '收起';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
     } else {
         content.classList.add('hidden');
         toggleBtn.textContent = '展开';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
     }
 }
 
-// 上传 Control 参考图片
+// 上传 Control 参考图片（点击选择）
 async function handleControlImageUpload(input) {
     const file = input.files[0];
     if (!file) return;
+    await uploadControlImageFile(file);
+}
 
+// 上传 Control 参考图片核心逻辑
+async function uploadControlImageFile(file) {
     if (!file.type.startsWith('image/')) {
         showToast('请选择图片文件');
         return;
@@ -1763,6 +1770,29 @@ async function handleControlImageUpload(input) {
     };
     reader.readAsDataURL(file);
 }
+
+// 绑定 Control 参考图片拖拽上传
+(function setupControlDropzone() {
+    const dropzone = document.getElementById('controlImageDropzone');
+    if (!dropzone) return;
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+    });
+
+    dropzone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+        const file = e.dataTransfer.files[0];
+        if (file) uploadControlImageFile(file);
+    });
+})();
 
 // ========== Control 图片裁剪 ==========
 let cropState = {
